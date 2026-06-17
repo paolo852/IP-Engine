@@ -11,12 +11,14 @@ from forge.config import (
     ConfigError,
     load_connectors_config,
     load_dormancy_config,
+    load_organisation_config,
     load_scoring_config,
 )
 
 REPO_SCORING = "config/scoring.yaml"
 REPO_DORMANCY = "config/dormancy.yaml"
 REPO_CONNECTORS = "config/connectors.yaml"
+REPO_ORGANISATION = "config/organisation.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -29,6 +31,29 @@ def test_repo_dormancy_config_is_valid():
     cfg = load_dormancy_config(REPO_DORMANCY)
     assert cfg.patents["min_age_years"] == 3
     assert cfg.project_results["max_years_since_end"] == 5
+    assert "encumbrance_clear_values" in cfg.signals
+
+
+def test_repo_organisation_config_is_valid():
+    org = load_organisation_config(REPO_ORGANISATION)
+    assert org.matches("synthetic research org")  # case-insensitive
+    assert org.matches("SRO")
+    assert not org.matches("Some Other Company")
+    assert not org.matches(None)
+
+
+def test_organisation_requires_identifiers(tmp_path):
+    p = tmp_path / "organisation.yaml"
+    p.write_text("organisation:\n  name: X\n")
+    with pytest.raises(ConfigError, match="identifiers"):
+        load_organisation_config(p)
+
+
+def test_dormancy_signals_must_be_mapping(tmp_path):
+    p = tmp_path / "dormancy.yaml"
+    p.write_text("patents: {}\nproject_results: {}\nsignals: [1, 2]\n")
+    with pytest.raises(ConfigError, match="signals"):
+        load_dormancy_config(p)
 
 
 def _write(tmp_path, name, body):

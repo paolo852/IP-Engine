@@ -1,0 +1,12 @@
+# Our organisation's identity — CONFIG, NOT CODE (rule 3).
+# Used by the L4 dormancy ownership check ("our org is owner/co-owner") and,
+# later, by ingestion to flag own-portfolio assets. Synthetic placeholder values
+# for development (rule 4); real identifiers are environment-specific.
+
+organisation:
+  name: "Synthetic Research Org"
+  # Name variants that count as "us" when matching an asset's owners/co-owners.
+  identifiers:
+    - "Synthetic Research Org"
+    - "Synthetic Research Org GmbH"
+    - "SRO"

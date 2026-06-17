@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -99,22 +99,64 @@ def load_scoring_config(path: str | os.PathLike[str]) -> ScoringConfig:
 
 @dataclass(frozen=True)
 class DormancyConfig:
-    """Validated dormancy thresholds for each asset family."""
+    """Validated dormancy thresholds + signal definitions for each asset family.
+
+    ``signals`` holds the (also configurable) markers the L4 rules use to derive
+    boolean facts from asset fields — e.g. which ``encumbrances`` values count as
+    "clear". Keeping these in config means no thresholds or magic strings live in
+    the rule code (rule 3).
+    """
 
     patents: dict
     project_results: dict
+    signals: dict = field(default_factory=dict)
 
 
 def load_dormancy_config(path: str | os.PathLike[str]) -> DormancyConfig:
-    """Load dormancy thresholds. Shape-validated; semantics consumed later (L4)."""
+    """Load dormancy thresholds. Shape-validated; semantics consumed by L4 rules."""
     data = _read_yaml(path)
     for section in ("patents", "project_results"):
         if not isinstance(data.get(section), dict):
             raise ConfigError(f"dormancy config must have a '{section}' mapping")
+    signals = data.get("signals", {})
+    if not isinstance(signals, dict):
+        raise ConfigError("dormancy 'signals' must be a mapping if present")
     return DormancyConfig(
         patents=data["patents"],
         project_results=data["project_results"],
+        signals=signals,
     )
+
+
+@dataclass(frozen=True)
+class OrganisationConfig:
+    """Our organisation's identity — used by the dormancy ownership check.
+
+    Identifiers are the name variants that count as "us" when matching an asset's
+    owners/co-owners. Config, not code: who "we" are is never hard-coded.
+    """
+
+    name: str
+    identifiers: tuple[str, ...]
+
+    def matches(self, party: str | None) -> bool:
+        if not party:
+            return False
+        needle = party.strip().lower()
+        return any(needle == ident.strip().lower() for ident in self.identifiers)
+
+
+def load_organisation_config(path: str | os.PathLike[str]) -> OrganisationConfig:
+    """Load the organisation identity used by ownership-based rules."""
+    data = _read_yaml(path)
+    org = data.get("organisation")
+    if not isinstance(org, dict):
+        raise ConfigError("organisation config must have an 'organisation' mapping")
+    identifiers = org.get("identifiers") or []
+    if not isinstance(identifiers, list) or not identifiers:
+        raise ConfigError("organisation config needs a non-empty 'identifiers' list")
+    name = org.get("name") or identifiers[0]
+    return OrganisationConfig(name=str(name), identifiers=tuple(str(i) for i in identifiers))
 
 
 @dataclass(frozen=True)

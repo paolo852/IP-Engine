@@ -22,3 +22,21 @@ project_results:
   max_years_since_end: 5
   require_no_exploitation_event: true
   require_org_ownership: true
+
+signals:
+  # How the rules derive boolean facts from asset fields (also config, not code).
+  # An 'encumbrances' value in this (case-insensitive) set means "no active
+  # licence/option/spin-off"; any other non-empty value counts as an encumbrance.
+  encumbrance_clear_values:
+    - ""
+    - none
+    - none recorded
+    - no encumbrances
+    - unencumbered
+  # key_dates entries whose presence signals an exploitation event since project end.
+  exploitation_event_date_keys:
+    - exploitation_date
+    - licence_date
+    - license_date
+    - spinoff_date
+    - spin_off_date

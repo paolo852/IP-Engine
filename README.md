@@ -20,6 +20,11 @@ Implemented so far:
   framework plus the EPO Open Patent Services connector: OAuth2 auth, biblio
   fetch, namespace-tolerant XML parsing, and normalisation into the L2 schema
   with provenance on every field. Runs are fault-tolerant and resumable.
+- **Slice 3 — deterministic dormancy rules (L4).** A config-driven, explainable
+  rule engine for patents and project results: every threshold and signal marker
+  comes from config, each verdict lists its conditions (pass/fail/unknown), the
+  asset field read, and the threshold. Missing inputs yield `unknown`, never a
+  guess. Humans decide; this only flags + evidences candidates.
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -36,6 +41,7 @@ Five layers + cross-cutting governance:
   cross-referencing.
 - **L4 Scoring & clustering** — deterministic dormancy rules, 6-dimension
   ventureability score (configurable weights), sector clustering.
+  ← *dormancy rules implemented here.*
 - **L5 Output** — market-context briefs, committee dashboard, decision capture.
 - **Governance** — grounding/audit, RBAC, GDPR/EU-hosting, prompt-injection hygiene.
 
@@ -68,6 +74,9 @@ Five layers + cross-cutting governance:
 | `field_provenance` | Links each populated factual asset field to ≥1 source. |
 | `evidence` | Normalised, derived cross-stream signal (S1–S4), kept separate from raw. |
 
+Dormancy assessments are a pure computation over these grounded fields
+(`forge.dormancy`), not yet persisted — they are produced and explained on demand.
+
 ## Getting started
 
 Requires Python 3.11+ and PostgreSQL 16 binaries on the host.
@@ -85,6 +94,9 @@ python scripts/roundtrip_demo.py
 # Ingest real patents from EPO OPS (needs free OPS credentials):
 export FORGE_EPO_OPS_KEY=...  FORGE_EPO_OPS_SECRET=...
 python scripts/ingest_epo_ops.py EP1000000 EP1000001
+
+# Classify synthetic assets with the dormancy rules (no DB/network needed):
+python scripts/dormancy_demo.py
 ```
 
 ### Tests
@@ -101,6 +113,8 @@ system binaries for the duration of the run. Point them at an existing database
 ## Configuration & secrets
 
 - `config/dormancy.yaml`, `config/scoring.yaml` — editable thresholds/weights.
+- `config/connectors.yaml` — connector endpoints/formats (no secrets).
+- `config/organisation.yaml` — our org's identity for ownership-based rules.
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -112,8 +126,10 @@ system binaries for the duration of the run. Point them at an existing database
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
 - L3 LLM profiling, grounded brief drafter, the remaining streams (S4 → S3 → S1).
-- L4 dormancy rule *evaluation* and the scoring *function* (the **config** for
-  both exists and is validated; the consuming logic is a later slice).
+- Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
+  rule engine exists; wiring it across the DB and recording results is later).
+- L4 ventureability scoring *function* (the **config** exists and is validated;
+  the consuming logic is build-order slice 6).
 - L5 dashboard and decision/outcome capture; governance (RBAC, EU-hosting).
 
 Build order and full scope live in the project context (`CLAUDE.md` equivalent).
