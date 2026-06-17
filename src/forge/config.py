@@ -186,3 +186,40 @@ def load_connectors_config(path: str | os.PathLike[str]) -> ConnectorsConfig:
         if not epo.get(key):
             raise ConfigError(f"epo_ops connector config missing {key!r}")
     return ConnectorsConfig(sections=data)
+
+
+@dataclass(frozen=True)
+class LLMConfig:
+    """Provider-agnostic LLM settings. EU-hosting preferred via ``base_url``.
+
+    The provider/region is swappable here so the Engine is not locked to one
+    vendor or location. API keys are NEVER stored here — they come from the
+    environment (rule: no secrets in code).
+    """
+
+    provider: str
+    model: str
+    base_url: str | None
+    max_tokens: int
+    adaptive_thinking: bool
+
+
+def load_llm_config(path: str | os.PathLike[str]) -> LLMConfig:
+    """Load + validate LLM settings."""
+    data = _read_yaml(path)
+    model = data.get("model")
+    if not model:
+        raise ConfigError("llm config must set 'model'")
+    try:
+        max_tokens = int(data.get("max_tokens", 4096))
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"llm 'max_tokens' must be an integer: {exc}") from exc
+    if max_tokens <= 0:
+        raise ConfigError("llm 'max_tokens' must be positive")
+    return LLMConfig(
+        provider=str(data.get("provider", "anthropic")),
+        model=str(model),
+        base_url=data.get("base_url"),
+        max_tokens=max_tokens,
+        adaptive_thinking=bool(data.get("adaptive_thinking", True)),
+    )

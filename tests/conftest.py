@@ -13,7 +13,14 @@ from forge.db.base import create_db_engine, make_session_factory
 
 from ._pg import PostgresUnavailable, start_embedded
 
-_TABLES = ("field_provenance", "evidence", "asset", "source")
+_TABLES = (
+    "profile_grounding",
+    "asset_profile",
+    "field_provenance",
+    "evidence",
+    "asset",
+    "source",
+)
 
 
 @pytest.fixture(scope="session")

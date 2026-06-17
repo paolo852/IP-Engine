@@ -253,3 +253,70 @@ class Evidence(Base):
 
     asset: Mapped[Asset] = relationship(back_populates="evidence")
     source: Mapped[Source] = relationship()
+
+
+class AssetProfile(Base):
+    """A grounded, structured profile derived by the L3 LLM profiling service.
+
+    A DERIVED signal (rule 5): stored separately from raw asset text, attributed
+    to an LLM-enrichment ``Source`` (licence=internal). The grounding for each
+    statement lives in ``profile_grounding`` so a profile sentence is never
+    emitted without a verbatim quote tying it back to a source field (rule 1).
+    """
+
+    __tablename__ = "asset_profile"
+    __table_args__ = (
+        UniqueConstraint("asset_id", name="uq_asset_profile_asset"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset.id", ondelete="CASCADE"), nullable=False
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("source.id", ondelete="RESTRICT"), nullable=False
+    )
+    problem: Mapped[str] = mapped_column(Text, nullable=False)
+    solution: Mapped[str] = mapped_column(Text, nullable=False)
+    applications: Mapped[list] = mapped_column(JSONB, nullable=False)
+    query_terms: Mapped[list] = mapped_column(JSONB, nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    asset: Mapped[Asset] = relationship()
+    source: Mapped[Source] = relationship()
+    grounding: Mapped[list["ProfileGrounding"]] = relationship(
+        back_populates="profile",
+        cascade="all, delete-orphan",
+        order_by="ProfileGrounding.field_name",
+    )
+
+
+class ProfileGrounding(Base):
+    """One profile statement's verbatim quote + the asset field it was found in.
+
+    This is the grounding scaffolding made physical: each row proves a generated
+    statement is supported by an exact span of the asset's own (already-grounded)
+    text.
+    """
+
+    __tablename__ = "profile_grounding"
+    __table_args__ = (Index("ix_profile_grounding_profile", "profile_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset_profile.id", ondelete="CASCADE"), nullable=False
+    )
+    # The profile statement this grounds, e.g. "problem" or "application[0]".
+    field_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    supporting_quote: Mapped[str] = mapped_column(Text, nullable=False)
+    # The asset field the quote was located in, e.g. "claims_or_description".
+    source_field: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    profile: Mapped[AssetProfile] = relationship(back_populates="grounding")

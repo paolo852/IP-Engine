@@ -10,10 +10,20 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from .db.models import Asset, Evidence, FieldProvenance, Source
+from .db.models import (
+    Asset,
+    AssetProfile,
+    Evidence,
+    FieldProvenance,
+    Licence,
+    ProfileGrounding,
+    Source,
+)
 
 
 class GroundingError(ValueError):
@@ -103,3 +113,66 @@ def provenance_map(asset: Asset) -> dict[str, list[Source]]:
     for link in asset.provenance:
         out.setdefault(link.field_name, []).append(link.source)
     return out
+
+
+def save_profile(session: Session, asset: Asset, profile) -> AssetProfile:
+    """Persist a grounded AssetProfile, refusing any ungrounded statement.
+
+    ``profile`` is a ``forge.enrichment.AssetProfile``. Every grounded statement
+    must carry a located ``source_field`` (set by verification) — otherwise this
+    raises GroundingError and commits nothing, keeping "no source -> no claim"
+    true at the persistence seam too.
+    """
+    from .enrichment.profiling import GroundingError  # local import avoids cycle
+
+    grounded = profile.grounded_fields()
+    missing = [gf.name for gf in grounded if gf.source_field is None]
+    if missing:
+        raise GroundingError(
+            "refusing to persist ungrounded profile statements: " + ", ".join(missing)
+        )
+
+    # The LLM enrichment act is itself a Source (a derived, internal-licence
+    # signal — never licensed raw data).
+    source = Source(
+        source_type="llm:profiling",
+        licence=Licence.internal,
+        locator=f"{profile.model}/{profile.prompt_version}",
+        retrieved_at=datetime.now(timezone.utc),
+    )
+    row = AssetProfile(
+        asset=asset,
+        source=source,
+        problem=profile.problem.value,
+        solution=profile.solution.value,
+        applications=[a.value for a in profile.applications],
+        query_terms=list(profile.query_terms),
+        model=profile.model,
+        prompt_version=profile.prompt_version,
+    )
+    for gf in grounded:
+        row.grounding.append(
+            ProfileGrounding(
+                field_name=gf.name,
+                supporting_quote=gf.quote,
+                source_field=gf.source_field,
+            )
+        )
+
+    session.add(source)
+    session.add(row)
+    session.commit()
+    return row
+
+
+def get_profile(session: Session, asset_id: uuid.UUID) -> AssetProfile | None:
+    """Load an asset's profile with its grounding and source attached."""
+    stmt = (
+        select(AssetProfile)
+        .where(AssetProfile.asset_id == asset_id)
+        .options(
+            selectinload(AssetProfile.grounding),
+            selectinload(AssetProfile.source),
+        )
+    )
+    return session.execute(stmt).scalar_one_or_none()

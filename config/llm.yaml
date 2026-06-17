@@ -1,0 +1,13 @@
+# LLM provider settings — provider-agnostic so the vendor/region is swappable.
+# EU-hosting is preferred (governance): point base_url at an EU-hosted gateway
+# or regional endpoint when available. CONFIG, not code (rule 2/3 spirit).
+#
+# API keys are NEVER stored here. The provider reads them from the environment
+# (FORGE_LLM_API_KEY, falling back to the SDK's own ANTHROPIC_API_KEY).
+
+provider: anthropic
+# Default to the latest, most capable Claude model for grounded enrichment.
+model: claude-opus-4-8
+# base_url: https://your-eu-hosted-gateway.example/anthropic
+max_tokens: 4096
+adaptive_thinking: true

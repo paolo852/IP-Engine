@@ -11,6 +11,7 @@ from forge.config import (
     ConfigError,
     load_connectors_config,
     load_dormancy_config,
+    load_llm_config,
     load_organisation_config,
     load_scoring_config,
 )
@@ -19,6 +20,7 @@ REPO_SCORING = "config/scoring.yaml"
 REPO_DORMANCY = "config/dormancy.yaml"
 REPO_CONNECTORS = "config/connectors.yaml"
 REPO_ORGANISATION = "config/organisation.yaml"
+REPO_LLM = "config/llm.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -186,3 +188,24 @@ def test_unknown_connector_section_lookup_raises():
     cfg = load_connectors_config(REPO_CONNECTORS)
     with pytest.raises(ConfigError, match="no connector config section"):
         cfg.section("does_not_exist")
+
+
+def test_repo_llm_config_is_valid():
+    cfg = load_llm_config(REPO_LLM)
+    assert cfg.provider == "anthropic"
+    assert cfg.model == "claude-opus-4-8"  # latest, most capable default
+    assert cfg.max_tokens > 0
+
+
+def test_llm_config_requires_model(tmp_path):
+    p = tmp_path / "llm.yaml"
+    p.write_text("provider: anthropic\n")
+    with pytest.raises(ConfigError, match="model"):
+        load_llm_config(p)
+
+
+def test_llm_config_rejects_nonpositive_max_tokens(tmp_path):
+    p = tmp_path / "llm.yaml"
+    p.write_text("model: claude-opus-4-8\nmax_tokens: 0\n")
+    with pytest.raises(ConfigError, match="positive"):
+        load_llm_config(p)

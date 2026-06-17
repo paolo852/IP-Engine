@@ -25,6 +25,14 @@ Implemented so far:
   comes from config, each verdict lists its conditions (pass/fail/unknown), the
   asset field read, and the threshold. Missing inputs yield `unknown`, never a
   guess. Humans decide; this only flags + evidences candidates.
+- **Slice 4 — LLM profiling + grounding scaffolding (L3).** A provider-agnostic
+  LLM wrapper (default: Claude via the official SDK; region/vendor swappable via
+  `config/llm.yaml`, key from env) and a profiling service that turns an asset's
+  claims into a structured `{problem, solution, applications}` profile plus
+  problem-space `query_terms`. Every generated statement must carry a verbatim
+  quote that is verified against the asset's own text; an unverifiable quote is
+  rejected and the asset field each quote came from is recorded — grounding for
+  generative output, enforced at build and at persistence.
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -38,7 +46,7 @@ Five layers + cross-cutting governance:
 - **L2 Asset store** — unified schema, PostgreSQL, single source of truth,
   provenance per field. ← *implemented here.*
 - **L3 Enrichment** — LLM profiling, grounded brief drafter, 4-stream
-  cross-referencing.
+  cross-referencing. ← *LLM profiling + grounding scaffolding implemented here.*
 - **L4 Scoring & clustering** — deterministic dormancy rules, 6-dimension
   ventureability score (configurable weights), sector clustering.
   ← *dormancy rules implemented here.*
@@ -73,6 +81,8 @@ Five layers + cross-cutting governance:
 | `source` | Where data came from; carries a licence class + raw-data pointer. |
 | `field_provenance` | Links each populated factual asset field to ≥1 source. |
 | `evidence` | Normalised, derived cross-stream signal (S1–S4), kept separate from raw. |
+| `asset_profile` | LLM-derived `{problem, solution, applications}` profile (internal-licence source). |
+| `profile_grounding` | The verbatim quote + asset field grounding each profile statement. |
 
 Dormancy assessments are a pure computation over these grounded fields
 (`forge.dormancy`), not yet persisted — they are produced and explained on demand.
@@ -97,6 +107,9 @@ python scripts/ingest_epo_ops.py EP1000000 EP1000001
 
 # Classify synthetic assets with the dormancy rules (no DB/network needed):
 python scripts/dormancy_demo.py
+
+# Profile a synthetic asset and show the grounding (canned LLM, no key/network):
+python scripts/profile_demo.py
 ```
 
 ### Tests
@@ -115,6 +128,7 @@ system binaries for the duration of the run. Point them at an existing database
 - `config/dormancy.yaml`, `config/scoring.yaml` — editable thresholds/weights.
 - `config/connectors.yaml` — connector endpoints/formats (no secrets).
 - `config/organisation.yaml` — our org's identity for ownership-based rules.
+- `config/llm.yaml` — LLM provider/model/region (no keys; EU-hosting via base_url).
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -125,7 +139,9 @@ system binaries for the duration of the run. Point them at an existing database
   cross-connector entity resolution is not yet implemented).
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
-- L3 LLM profiling, grounded brief drafter, the remaining streams (S4 → S3 → S1).
+- L3 grounded brief drafter and the four cross-referencing streams (S2 → S4 → S3 → S1).
+- Wiring profiling into a batch enrichment pass over the store, and a real-LLM
+  smoke path (the service + provider exist; live runs need credentials).
 - Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 ventureability scoring *function* (the **config** exists and is validated;
