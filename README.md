@@ -65,6 +65,13 @@ Implemented so far:
   produced it. Dimensions with no signal yet (capital_intensity, team_availability)
   are reported **indeterminate** rather than fabricated; the overall score is the
   weighted mean over scorable dimensions and reports its coverage.
+- **Slice 8 — market-context brief generator (L5).** Composes the committee
+  document deterministically from the grounded inputs (profile, dormancy, stream
+  evidence, corroboration, score). Every **factual** sentence carries a source
+  pointer (asset field, profile quote, or evidence record) by construction;
+  advisory lines (routing, headline score, "no data" notes) are marked
+  non-factual. `build_brief` verifies **zero unsourced factual sentences** and
+  renders to Markdown.
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -83,6 +90,7 @@ Five layers + cross-cutting governance:
   ventureability score (configurable weights), sector clustering.
   ← *dormancy rules + ventureability scoring implemented here.*
 - **L5 Output** — market-context briefs, committee dashboard, decision capture.
+  ← *grounded market-context brief generator implemented here.*
 - **Governance** — grounding/audit, RBAC, GDPR/EU-hosting, prompt-injection hygiene.
 
 ## Non-negotiable rules (how this code is shaped)
@@ -157,6 +165,9 @@ python scripts/corroborate_demo.py
 
 # Score ventureability with a full, evidence-backed breakdown (no network):
 python scripts/ventureability_demo.py
+
+# Generate a grounded market-context brief (zero unsourced sentences, no network):
+python scripts/brief_demo.py
 ```
 
 ### Tests
@@ -190,8 +201,8 @@ system binaries for the duration of the run. Point them at an existing database
   cross-connector entity resolution is not yet implemented).
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
-- L3 grounded brief drafter and the last stream S1 (Dealroom, licensed, built
-  last); S1 will fold into the existing corroboration as a fourth indicator.
+- The last stream S1 (Dealroom, licensed, built last); S1 will fold into the
+  existing corroboration as a fourth indicator and S1 evidence into the brief.
 - OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
   names need a biblio follow-up per citing doc — currently fake-only).
 - Wiring profiling/streams into a batch enrichment pass over the store, and a
@@ -200,6 +211,6 @@ system binaries for the duration of the run. Point them at an existing database
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 capital_intensity + team_availability dimensions (indeterminate until S1
   funding / internal team data lands); persisting scores; sector clustering (L4).
-- L5 dashboard and decision/outcome capture; governance (RBAC, EU-hosting).
+- L5 committee dashboard and decision/outcome capture; governance (RBAC, EU-hosting).
 
 Build order and full scope live in the project context (`CLAUDE.md` equivalent).
