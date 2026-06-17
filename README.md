@@ -72,6 +72,12 @@ Implemented so far:
   advisory lines (routing, headline score, "no data" notes) are marked
   non-factual. `build_brief` verifies **zero unsourced factual sentences** and
   renders to Markdown.
+- **Slice 9 — decision/outcome capture + dashboard (L5).** Persists the
+  committee's decision per asset (snapshotting the Engine's routing + score that
+  informed it) and the realised outcome later — the data the recalibration loop
+  consumes. The `dashboard` read model returns the ranked pipeline (every asset
+  with its latest decision/outcome + score) a UI renders. Humans decide; the
+  Engine only records.
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -90,7 +96,7 @@ Five layers + cross-cutting governance:
   ventureability score (configurable weights), sector clustering.
   ← *dormancy rules + ventureability scoring implemented here.*
 - **L5 Output** — market-context briefs, committee dashboard, decision capture.
-  ← *grounded market-context brief generator implemented here.*
+  ← *brief generator + decision/outcome capture + dashboard implemented here.*
 - **Governance** — grounding/audit, RBAC, GDPR/EU-hosting, prompt-injection hygiene.
 
 ## Non-negotiable rules (how this code is shaped)
@@ -123,6 +129,8 @@ Five layers + cross-cutting governance:
 | `evidence` | Normalised, derived cross-stream signal (S1–S4), kept separate from raw. |
 | `asset_profile` | LLM-derived `{problem, solution, applications}` profile (internal-licence source). |
 | `profile_grounding` | The verbatim quote + asset field grounding each profile statement. |
+| `committee_decision` | The committee's decision + the Engine's routing/score snapshot at decision time. |
+| `asset_outcome` | The realised outcome (licensed / spun-out / parked …), feeding recalibration. |
 
 Dormancy assessments are a pure computation over these grounded fields
 (`forge.dormancy`), not yet persisted — they are produced and explained on demand.
@@ -168,6 +176,9 @@ python scripts/ventureability_demo.py
 
 # Generate a grounded market-context brief (zero unsourced sentences, no network):
 python scripts/brief_demo.py
+
+# Capture decisions and print the ranked committee dashboard (throwaway DB):
+python scripts/dashboard_demo.py
 ```
 
 ### Tests
@@ -211,6 +222,7 @@ system binaries for the duration of the run. Point them at an existing database
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 capital_intensity + team_availability dimensions (indeterminate until S1
   funding / internal team data lands); persisting scores; sector clustering (L4).
-- L5 committee dashboard and decision/outcome capture; governance (RBAC, EU-hosting).
+- L5 dashboard UI (the read model is built; the web front-end is out of scope here);
+  quarterly recalibration loop + log (slice 10); governance (RBAC, EU-hosting).
 
 Build order and full scope live in the project context (`CLAUDE.md` equivalent).

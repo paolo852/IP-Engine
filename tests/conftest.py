@@ -14,6 +14,8 @@ from forge.db.base import create_db_engine, make_session_factory
 from ._pg import PostgresUnavailable, start_embedded
 
 _TABLES = (
+    "asset_outcome",
+    "committee_decision",
     "profile_grounding",
     "asset_profile",
     "field_provenance",

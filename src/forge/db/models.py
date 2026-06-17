@@ -320,3 +320,83 @@ class ProfileGrounding(Base):
     )
 
     profile: Mapped[AssetProfile] = relationship(back_populates="grounding")
+
+
+class DecisionType(str, enum.Enum):
+    """The committee's chosen action for an asset. Humans decide; we record."""
+
+    sprint = "sprint"
+    license = "license"
+    park = "park"
+    hold = "hold"
+    reject = "reject"
+
+
+class OutcomeType(str, enum.Enum):
+    """The realised real-world result, recorded later (feeds recalibration)."""
+
+    pending = "pending"
+    in_progress = "in_progress"
+    spun_out = "spun_out"
+    licensed = "licensed"
+    parked = "parked"
+    abandoned = "abandoned"
+
+
+class CommitteeDecision(Base):
+    """A governance record of the committee's decision on an asset.
+
+    Snapshots the Engine's recommendation at decision time (routing + score) so
+    quarterly recalibration can compare the Engine's signal against the human
+    decision and the eventual outcome. This is a human input with an actor +
+    timestamp, not a factual claim the Engine emits.
+    """
+
+    __tablename__ = "committee_decision"
+    __table_args__ = (Index("ix_committee_decision_asset", "asset_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset.id", ondelete="CASCADE"), nullable=False
+    )
+    decision: Mapped[DecisionType] = mapped_column(
+        Enum(DecisionType, name="decision_type"), nullable=False
+    )
+    # The Engine's recommendation at the moment of decision (nullable snapshot).
+    engine_routing: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    engine_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    engine_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    asset: Mapped[Asset] = relationship()
+
+
+class AssetOutcome(Base):
+    """The realised outcome for an asset, recorded when known. Feeds recalibration."""
+
+    __tablename__ = "asset_outcome"
+    __table_args__ = (Index("ix_asset_outcome_asset", "asset_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset.id", ondelete="CASCADE"), nullable=False
+    )
+    # Optional link to the decision this outcome followed from.
+    decision_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("committee_decision.id", ondelete="SET NULL"), nullable=True
+    )
+    outcome: Mapped[OutcomeType] = mapped_column(
+        Enum(OutcomeType, name="outcome_type"), nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recorded_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    asset: Mapped[Asset] = relationship()
+    decision: Mapped[CommitteeDecision | None] = relationship()

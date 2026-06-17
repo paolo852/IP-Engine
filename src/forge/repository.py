@@ -17,10 +17,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from .db.models import (
     Asset,
+    AssetOutcome,
     AssetProfile,
+    CommitteeDecision,
+    DecisionType,
     Evidence,
     FieldProvenance,
     Licence,
+    OutcomeType,
     ProfileGrounding,
     Source,
 )
@@ -222,3 +226,72 @@ def get_evidence(
     if stream is not None:
         stmt = stmt.where(Evidence.stream == stream)
     return list(session.execute(stmt).scalars())
+
+
+# -- L5 decision / outcome capture ------------------------------------------
+def record_decision(
+    session: Session,
+    asset: Asset,
+    *,
+    decision: DecisionType,
+    decided_by: str,
+    rationale: str | None = None,
+    engine_routing: str | None = None,
+    engine_score: float | None = None,
+    engine_coverage: float | None = None,
+) -> CommitteeDecision:
+    """Persist the committee's decision with the Engine's recommendation snapshot."""
+    row = CommitteeDecision(
+        asset=asset,
+        decision=decision,
+        decided_by=decided_by,
+        rationale=rationale,
+        engine_routing=engine_routing,
+        engine_score=engine_score,
+        engine_coverage=engine_coverage,
+    )
+    session.add(row)
+    session.commit()
+    return row
+
+
+def record_outcome(
+    session: Session,
+    asset: Asset,
+    *,
+    outcome: OutcomeType,
+    recorded_by: str,
+    notes: str | None = None,
+    decision: CommitteeDecision | None = None,
+) -> AssetOutcome:
+    """Persist a realised outcome for an asset (optionally linked to a decision)."""
+    row = AssetOutcome(
+        asset=asset,
+        outcome=outcome,
+        recorded_by=recorded_by,
+        notes=notes,
+        decision=decision,
+    )
+    session.add(row)
+    session.commit()
+    return row
+
+
+def latest_decision(session: Session, asset_id: uuid.UUID) -> CommitteeDecision | None:
+    stmt = (
+        select(CommitteeDecision)
+        .where(CommitteeDecision.asset_id == asset_id)
+        .order_by(CommitteeDecision.decided_at.desc(), CommitteeDecision.id.desc())
+        .limit(1)
+    )
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def latest_outcome(session: Session, asset_id: uuid.UUID) -> AssetOutcome | None:
+    stmt = (
+        select(AssetOutcome)
+        .where(AssetOutcome.asset_id == asset_id)
+        .order_by(AssetOutcome.recorded_at.desc(), AssetOutcome.id.desc())
+        .limit(1)
+    )
+    return session.execute(stmt).scalar_one_or_none()
