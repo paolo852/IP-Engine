@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Test / tooling
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local dev Postgres data + logs
+/tmp/pgdata/
+*.log
+
+# Secrets / local config
+.env
+.env.local

@@ -1,0 +1,13 @@
+# Ventureability score — a TRANSPARENT, documented weighted function with
+# config-set weights (non-negotiable rule 2). NO black-box ML.
+# Six dimensions; weights must sum to 1.0 (validated by forge.config).
+# Consumed by L4 scoring (later build-order slice 6). Present now so the seam
+# exists and weights are never hard-coded constants.
+
+weights:
+  technology_maturity: 0.20
+  market_pull: 0.25
+  ip_defensibility: 0.20
+  capital_intensity: 0.10
+  regulatory_pathway: 0.10
+  team_availability: 0.15

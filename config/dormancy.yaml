@@ -1,0 +1,24 @@
+# Dormancy rule thresholds — CONFIG, NOT CODE (non-negotiable rule 3).
+# Editable without touching source. Consumed by the L4 deterministic dormancy
+# rules (later build-order slice 3). Present now so the seam exists from slice 1.
+# Defaults taken from the FORGE spec.
+
+patents:
+  # An asset is a dormancy *candidate* when ALL hold:
+  #   - no active licence / option / spin-off
+  #   - age within [min_age_years, max_age_years]
+  #   - fee_status is one of fee_status_in
+  min_age_years: 3
+  max_age_years: 10
+  require_no_active_licence: true
+  fee_status_in: [paid, lapsing]
+
+project_results:
+  # Candidate when ALL hold:
+  #   - project ended within [min_years_since_end, max_years_since_end]
+  #   - no exploitation event since
+  #   - our org is owner / co-owner
+  min_years_since_end: 1
+  max_years_since_end: 5
+  require_no_exploitation_event: true
+  require_org_ownership: true
