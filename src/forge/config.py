@@ -115,3 +115,32 @@ def load_dormancy_config(path: str | os.PathLike[str]) -> DormancyConfig:
         patents=data["patents"],
         project_results=data["project_results"],
     )
+
+
+@dataclass(frozen=True)
+class ConnectorsConfig:
+    """Validated connector settings (endpoints, formats, throttle). No secrets."""
+
+    sections: dict
+
+    def section(self, name: str) -> dict:
+        if name not in self.sections:
+            raise ConfigError(f"no connector config section named {name!r}")
+        return self.sections[name]
+
+
+def load_connectors_config(path: str | os.PathLike[str]) -> ConnectorsConfig:
+    """Load + lightly validate connector settings.
+
+    Endpoints live in config (rule 3); credentials never do. Each known section
+    must carry the URLs its connector needs so failures surface at load time, not
+    mid-ingestion.
+    """
+    data = _read_yaml(path)
+    epo = data.get("epo_ops")
+    if not isinstance(epo, dict):
+        raise ConfigError("connectors config must have an 'epo_ops' mapping")
+    for key in ("base_url", "auth_url"):
+        if not epo.get(key):
+            raise ConfigError(f"epo_ops connector config missing {key!r}")
+    return ConnectorsConfig(sections=data)

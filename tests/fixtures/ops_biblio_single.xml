@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ops:world-patent-data xmlns:ops="http://ops.epo.org" xmlns="http://www.epo.org/exchange">
+  <exchange-documents>
+    <exchange-document system="ops.epo.org" family-id="99999999" country="EP" doc-number="9999999" kind="A1">
+      <bibliographic-data>
+        <publication-reference>
+          <document-id document-id-type="docdb">
+            <country>EP</country>
+            <doc-number>9999999</doc-number>
+            <kind>A1</kind>
+            <date>20210106</date>
+          </document-id>
+          <document-id document-id-type="epodoc">
+            <doc-number>EP9999999</doc-number>
+            <kind>A1</kind>
+            <date>20210106</date>
+          </document-id>
+        </publication-reference>
+        <application-reference>
+          <document-id document-id-type="docdb">
+            <country>EP</country>
+            <doc-number>19800001</doc-number>
+            <kind>A</kind>
+            <date>20190701</date>
+          </document-id>
+        </application-reference>
+        <priority-claims>
+          <priority-claim sequence="1">
+            <document-id document-id-type="docdb">
+              <country>EP</country>
+              <doc-number>18800001</doc-number>
+              <kind>A</kind>
+              <date>20180704</date>
+            </document-id>
+          </priority-claim>
+        </priority-claims>
+        <invention-title lang="de">Synthetischer photonischer Interconnect</invention-title>
+        <invention-title lang="en">Synthetic photonic interconnect for edge AI</invention-title>
+        <classifications-ipcr>
+          <classification-ipcr sequence="1">
+            <text>G02B   6/12       20060101AFI20201201BHEP</text>
+          </classification-ipcr>
+        </classifications-ipcr>
+        <parties>
+          <applicants>
+            <applicant sequence="1" data-format="original">
+              <applicant-name><name>SYNTHETIC RESEARCH ORG GMBH</name></applicant-name>
+            </applicant>
+            <applicant sequence="1" data-format="epodoc">
+              <applicant-name><name>SYNTHETIC RESEARCH ORG</name></applicant-name>
+            </applicant>
+          </applicants>
+          <inventors>
+            <inventor sequence="1" data-format="original">
+              <inventor-name><name>ROSSI, Alessandro</name></inventor-name>
+            </inventor>
+            <inventor sequence="1" data-format="epodoc">
+              <inventor-name><name>ROSSI ALESSANDRO</name></inventor-name>
+            </inventor>
+            <inventor sequence="2" data-format="epodoc">
+              <inventor-name><name>BIANCHI BEATRICE</name></inventor-name>
+            </inventor>
+          </inventors>
+        </parties>
+      </bibliographic-data>
+      <abstract lang="en">
+        <p>A synthetic photonic interconnect reducing energy per bit for edge inference workloads. This is invented test data, not a real patent.</p>
+      </abstract>
+    </exchange-document>
+  </exchange-documents>
+</ops:world-patent-data>

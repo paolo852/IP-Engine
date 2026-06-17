@@ -1,0 +1,15 @@
+# Connector settings — CONFIG, NOT CODE (rule 3). Endpoints, formats, and
+# politeness limits are editable here, never hard-coded. Credentials are NOT
+# stored here; they live in the environment (rule: no secrets in source).
+
+epo_ops:
+  # EPO Open Patent Services (free, documented). The first stream built (S2).
+  base_url: "http://ops.epo.org/3.2/rest-services"
+  auth_url: "https://ops.epo.org/3.2/auth/accesstoken"
+  # Reference format used for lookups: "epodoc" or "docdb".
+  reference_format: epodoc
+  request_timeout_seconds: 30
+  # OPS enforces throttling/quotas; minimum spacing between calls (politeness).
+  min_request_interval_seconds: 1.0
+  # L2 source_layer tag stamped on assets from this connector.
+  source_layer: "L1.epo_ops"

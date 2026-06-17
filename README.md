@@ -11,17 +11,25 @@ routing logic — not novel algorithms.
 
 ## Status
 
-This repository currently implements **build-order slice 1: the L2 asset store**
-— the unified schema, PostgreSQL, migrations, and a round-trip of a synthetic
-asset, with the grounding rule and licence-separation seam built in from the
-start. Everything else (connectors, enrichment, scoring, dashboard) is stubbed
-or not yet present; see "What is stubbed" below.
+Implemented so far:
+
+- **Slice 1 — L2 asset store.** Unified schema, PostgreSQL, Alembic migrations,
+  round-trip of a synthetic asset; grounding rule and licence-separation seam
+  built in from the start.
+- **Slice 2 — EPO OPS connector (stream S2, free, built first).** An L1 connector
+  framework plus the EPO Open Patent Services connector: OAuth2 auth, biblio
+  fetch, namespace-tolerant XML parsing, and normalisation into the L2 schema
+  with provenance on every field. Runs are fault-tolerant and resumable.
+
+Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
+see "What is stubbed" below.
 
 ## Architecture (target)
 
 Five layers + cross-cutting governance:
 
 - **L1 Ingestion & connectors** — connector framework, incremental fetch, dedup.
+  ← *framework + EPO OPS connector implemented here.*
 - **L2 Asset store** — unified schema, PostgreSQL, single source of truth,
   provenance per field. ← *implemented here.*
 - **L3 Enrichment** — LLM profiling, grounded brief drafter, 4-stream
@@ -73,6 +81,10 @@ eval "$(scripts/pg_dev.sh)"
 # Create the schema, then round-trip a synthetic asset:
 alembic upgrade head
 python scripts/roundtrip_demo.py
+
+# Ingest real patents from EPO OPS (needs free OPS credentials):
+export FORGE_EPO_OPS_KEY=...  FORGE_EPO_OPS_SECRET=...
+python scripts/ingest_epo_ops.py EP1000000 EP1000001
 ```
 
 ### Tests
@@ -94,8 +106,12 @@ system binaries for the duration of the run. Point them at an existing database
 
 ## What is stubbed / not yet built
 
-- L1 connectors (EPO OPS first), the scheduler, dedup/entity resolution.
-- L3 LLM profiling, grounded brief drafter, the four streams (S2 → S4 → S3 → S1).
+- L1 scheduler / incremental cron, dedup & cross-source entity resolution
+  (the EPO OPS connector is built; re-runs are idempotent per publication, but
+  cross-connector entity resolution is not yet implemented).
+- EPO OPS legal-status and claims/description endpoints (`legal_status` and
+  `claims_or_description` are left unset by the biblio connector for now).
+- L3 LLM profiling, grounded brief drafter, the remaining streams (S4 → S3 → S1).
 - L4 dormancy rule *evaluation* and the scoring *function* (the **config** for
   both exists and is validated; the consuming logic is a later slice).
 - L5 dashboard and decision/outcome capture; governance (RBAC, EU-hosting).

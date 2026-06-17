@@ -9,12 +9,14 @@ import pytest
 from forge.config import (
     VENTUREABILITY_DIMENSIONS,
     ConfigError,
+    load_connectors_config,
     load_dormancy_config,
     load_scoring_config,
 )
 
 REPO_SCORING = "config/scoring.yaml"
 REPO_DORMANCY = "config/dormancy.yaml"
+REPO_CONNECTORS = "config/connectors.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -134,3 +136,28 @@ def test_dormancy_missing_section_rejected(tmp_path):
     p = _write(tmp_path, "dormancy.yaml", "patents: {min_age_years: 3}\n")
     with pytest.raises(ConfigError, match="project_results"):
         load_dormancy_config(p)
+
+
+def test_repo_connectors_config_is_valid():
+    cfg = load_connectors_config(REPO_CONNECTORS)
+    epo = cfg.section("epo_ops")
+    assert epo["base_url"].startswith("http")
+    assert epo["auth_url"].startswith("http")
+
+
+def test_connectors_missing_epo_section_rejected(tmp_path):
+    p = _write(tmp_path, "connectors.yaml", "something_else: {}\n")
+    with pytest.raises(ConfigError, match="epo_ops"):
+        load_connectors_config(p)
+
+
+def test_connectors_missing_required_url_rejected(tmp_path):
+    p = _write(tmp_path, "connectors.yaml", "epo_ops:\n  reference_format: epodoc\n")
+    with pytest.raises(ConfigError, match="base_url"):
+        load_connectors_config(p)
+
+
+def test_unknown_connector_section_lookup_raises():
+    cfg = load_connectors_config(REPO_CONNECTORS)
+    with pytest.raises(ConfigError, match="no connector config section"):
+        cfg.section("does_not_exist")

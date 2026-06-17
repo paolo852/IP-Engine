@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edge case: a non-English-only title, no abstract, no inventors, no priority. -->
+<ops:world-patent-data xmlns:ops="http://ops.epo.org" xmlns="http://www.epo.org/exchange">
+  <exchange-documents>
+    <exchange-document system="ops.epo.org" family-id="88888888" country="EP" doc-number="8888888" kind="A1">
+      <bibliographic-data>
+        <publication-reference>
+          <document-id document-id-type="docdb">
+            <country>EP</country>
+            <doc-number>8888888</doc-number>
+            <kind>A1</kind>
+            <date>20200205</date>
+          </document-id>
+        </publication-reference>
+        <application-reference>
+          <document-id document-id-type="docdb">
+            <country>EP</country>
+            <doc-number>18700001</doc-number>
+            <kind>A</kind>
+            <date>20180810</date>
+          </document-id>
+        </application-reference>
+        <invention-title lang="fr">Dispositif synthétique de mesure</invention-title>
+        <parties>
+          <applicants>
+            <applicant sequence="1" data-format="epodoc">
+              <applicant-name><name>SYNTHETIC UNIVERSITY</name></applicant-name>
+            </applicant>
+          </applicants>
+        </parties>
+      </bibliographic-data>
+    </exchange-document>
+  </exchange-documents>
+</ops:world-patent-data>
