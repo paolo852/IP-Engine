@@ -14,6 +14,7 @@ from forge.config import (
     load_llm_config,
     load_organisation_config,
     load_scoring_config,
+    load_streams_config,
 )
 
 REPO_SCORING = "config/scoring.yaml"
@@ -21,6 +22,7 @@ REPO_DORMANCY = "config/dormancy.yaml"
 REPO_CONNECTORS = "config/connectors.yaml"
 REPO_ORGANISATION = "config/organisation.yaml"
 REPO_LLM = "config/llm.yaml"
+REPO_STREAMS = "config/streams.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -209,3 +211,17 @@ def test_llm_config_rejects_nonpositive_max_tokens(tmp_path):
     p.write_text("model: claude-opus-4-8\nmax_tokens: 0\n")
     with pytest.raises(ConfigError, match="positive"):
         load_llm_config(p)
+
+
+def test_repo_streams_config_is_valid():
+    cfg = load_streams_config(REPO_STREAMS)
+    s2 = cfg.section("s2_patents")
+    assert s2["filing_window_years"] >= 1
+    assert s2["max_neighbours"] >= 1
+
+
+def test_streams_missing_s2_section_rejected(tmp_path):
+    p = tmp_path / "streams.yaml"
+    p.write_text("something_else: {}\n")
+    with pytest.raises(ConfigError, match="s2_patents"):
+        load_streams_config(p)

@@ -204,6 +204,26 @@ class LLMConfig:
     adaptive_thinking: bool
 
 
+@dataclass(frozen=True)
+class StreamsConfig:
+    """Validated cross-referencing stream parameters."""
+
+    sections: dict
+
+    def section(self, name: str) -> dict:
+        if name not in self.sections:
+            raise ConfigError(f"no streams config section named {name!r}")
+        return self.sections[name]
+
+
+def load_streams_config(path: str | os.PathLike[str]) -> StreamsConfig:
+    """Load + lightly validate stream parameters."""
+    data = _read_yaml(path)
+    if not isinstance(data.get("s2_patents"), dict):
+        raise ConfigError("streams config must have an 's2_patents' mapping")
+    return StreamsConfig(sections=data)
+
+
 def load_llm_config(path: str | os.PathLike[str]) -> LLMConfig:
     """Load + validate LLM settings."""
     data = _read_yaml(path)

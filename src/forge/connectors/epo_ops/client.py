@@ -155,26 +155,35 @@ class OpsClient:
         Retries once after re-authentication on a 401 (expired/revoked token).
         """
         url = self.biblio_url(ref)
+        body, content_type = self.fetch(url, ref=ref)
+        return RawRecord(
+            ref=ref,
+            locator=url,
+            payload=body,
+            content_type=content_type,
+            retrieved_at=datetime.now(timezone.utc),
+        )
+
+    def fetch(self, url: str, *, ref: str = "") -> tuple[bytes, str]:
+        """Authenticated GET of an OPS URL → (body, content-type).
+
+        Shared by biblio fetch and the S2 search client. Maps HTTP status to the
+        same typed errors and re-authenticates once on a 401.
+        """
+        what = ref or url
         token = self._ensure_token()
         resp = self._get(url, token)
 
         if resp.status == 401:  # token rejected — re-auth once and retry
             self._token = None
-            token = self._ensure_token()
-            resp = self._get(url, token)
+            resp = self._get(url, self._ensure_token())
 
         if resp.status == 404:
-            raise OpsNotFound(f"no biblio for {ref!r}")
+            raise OpsNotFound(f"not found: {what!r}")
         if resp.status in (403, 429):
             reason = resp.header("X-Rejection-Reason", "")
-            raise OpsThrottled(f"OPS throttled {ref!r}: HTTP {resp.status} {reason}".strip())
+            raise OpsThrottled(f"OPS throttled {what!r}: HTTP {resp.status} {reason}".strip())
         if resp.status != 200:
-            raise OpsError(f"OPS error for {ref!r}: HTTP {resp.status}")
+            raise OpsError(f"OPS error for {what!r}: HTTP {resp.status}")
 
-        return RawRecord(
-            ref=ref,
-            locator=url,
-            payload=resp.body,
-            content_type=resp.header("Content-Type", "application/xml") or "application/xml",
-            retrieved_at=datetime.now(timezone.utc),
-        )
+        return resp.body, resp.header("Content-Type", "application/xml") or "application/xml"

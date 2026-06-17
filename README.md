@@ -33,6 +33,13 @@ Implemented so far:
   quote that is verified against the asset's own text; an unverifiable quote is
   rejected and the asset field each quote came from is recorded — grounding for
   generative output, enforced at build and at persistence.
+- **Slice 5 — S2 patents/citations cross-referencing (L3).** A streams framework
+  plus the first stream (S2, free, built first): the profile's problem-space
+  `query_terms` become typed queries that fan out via EPO OPS to measure
+  filing-trend slope, forward citations (+ citing entities), and neighbour
+  density. Every finding is normalised into the common `evidence` records
+  (source, match-strength, snippet, link) and persisted with provenance. Analysis
+  is deterministic; cross-stream agreement/conflict lands when more streams exist.
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -46,7 +53,7 @@ Five layers + cross-cutting governance:
 - **L2 Asset store** — unified schema, PostgreSQL, single source of truth,
   provenance per field. ← *implemented here.*
 - **L3 Enrichment** — LLM profiling, grounded brief drafter, 4-stream
-  cross-referencing. ← *LLM profiling + grounding scaffolding implemented here.*
+  cross-referencing. ← *profiling + grounding scaffolding + the S2 stream here.*
 - **L4 Scoring & clustering** — deterministic dormancy rules, 6-dimension
   ventureability score (configurable weights), sector clustering.
   ← *dormancy rules implemented here.*
@@ -110,6 +117,9 @@ python scripts/dormancy_demo.py
 
 # Profile a synthetic asset and show the grounding (canned LLM, no key/network):
 python scripts/profile_demo.py
+
+# Run the S2 patents/citations stream over canned data (no OPS creds/network):
+python scripts/stream_s2_demo.py
 ```
 
 ### Tests
@@ -129,6 +139,7 @@ system binaries for the duration of the run. Point them at an existing database
 - `config/connectors.yaml` — connector endpoints/formats (no secrets).
 - `config/organisation.yaml` — our org's identity for ownership-based rules.
 - `config/llm.yaml` — LLM provider/model/region (no keys; EU-hosting via base_url).
+- `config/streams.yaml` — cross-referencing stream parameters (S2 window/sampling).
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -139,9 +150,12 @@ system binaries for the duration of the run. Point them at an existing database
   cross-connector entity resolution is not yet implemented).
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
-- L3 grounded brief drafter and the four cross-referencing streams (S2 → S4 → S3 → S1).
-- Wiring profiling into a batch enrichment pass over the store, and a real-LLM
-  smoke path (the service + provider exist; live runs need credentials).
+- L3 grounded brief drafter and the remaining streams (S4 → S3 → S1) + cross-stream
+  agreement/conflict analysis (S2 is built; the framework is ready for the rest).
+- OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
+  names need a biblio follow-up per citing doc — currently fake-only).
+- Wiring profiling/streams into a batch enrichment pass over the store, and a
+  real-LLM/real-OPS smoke path (services exist; live runs need credentials).
 - Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 ventureability scoring *function* (the **config** exists and is validated;

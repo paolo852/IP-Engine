@@ -1,0 +1,9 @@
+# Cross-referencing stream parameters — CONFIG, not code (rule 3).
+# Consumed by L3 cross-referencing. Built one stream at a time: S2 first (free).
+
+s2_patents:
+  # Years of filing history used to estimate the field's filing-trend slope.
+  filing_window_years: 5
+  # Cap on neighbouring patents turned into evidence records per run (politeness
+  # + signal-to-noise; the density count itself is uncapped).
+  max_neighbours: 10

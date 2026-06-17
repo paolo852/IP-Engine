@@ -176,3 +176,49 @@ def get_profile(session: Session, asset_id: uuid.UUID) -> AssetProfile | None:
         )
     )
     return session.execute(stmt).scalar_one_or_none()
+
+
+def save_stream_result(session: Session, asset: Asset, result) -> list[Evidence]:
+    """Persist a cross-referencing StreamResult's findings as Evidence rows.
+
+    ``result`` is a ``forge.streams.StreamResult``. Each EvidenceRecord becomes
+    one Evidence row backed by its own Source — derived signals, separable from
+    licensed raw data (rule 5), each carrying provenance.
+    """
+    rows: list[Evidence] = []
+    for rec in result.evidence():
+        source = Source(
+            source_type=rec.source.source_type,
+            licence=rec.source.licence,
+            locator=rec.source.locator,
+            retrieved_at=datetime.now(timezone.utc),
+        )
+        evidence = Evidence(
+            asset=asset,
+            source=source,
+            stream=rec.stream,
+            observed_at=rec.observed_at,
+            match_strength=rec.match_strength,
+            snippet=rec.snippet,
+            link=rec.link,
+        )
+        session.add(source)
+        session.add(evidence)
+        rows.append(evidence)
+    session.commit()
+    return rows
+
+
+def get_evidence(
+    session: Session, asset_id: uuid.UUID, *, stream: str | None = None
+) -> list[Evidence]:
+    """Load an asset's evidence rows (optionally filtered to one stream)."""
+    stmt = (
+        select(Evidence)
+        .where(Evidence.asset_id == asset_id)
+        .options(selectinload(Evidence.source))
+        .order_by(Evidence.created_at)
+    )
+    if stream is not None:
+        stmt = stmt.where(Evidence.stream == stream)
+    return list(session.execute(stmt).scalars())
