@@ -7,3 +7,10 @@ s2_patents:
   # Cap on neighbouring patents turned into evidence records per run (politeness
   # + signal-to-noise; the density count itself is uncapped).
   max_neighbours: 10
+
+s3_roadmaps:
+  # Curated, indexed corpus of roadmaps / standards / regulations (public data).
+  corpus_path: data/s3_corpus.jsonl
+  # How many top matches to keep, and the minimum retrieval score to count as pull.
+  top_k: 5
+  min_score: 0.05

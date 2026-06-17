@@ -221,6 +221,9 @@ def load_streams_config(path: str | os.PathLike[str]) -> StreamsConfig:
     data = _read_yaml(path)
     if not isinstance(data.get("s2_patents"), dict):
         raise ConfigError("streams config must have an 's2_patents' mapping")
+    s3 = data.get("s3_roadmaps")
+    if not isinstance(s3, dict) or not s3.get("corpus_path"):
+        raise ConfigError("streams config must have 's3_roadmaps' with a 'corpus_path'")
     return StreamsConfig(sections=data)
 
 

@@ -220,6 +220,14 @@ def test_repo_streams_config_is_valid():
     s2 = cfg.section("s2_patents")
     assert s2["filing_window_years"] >= 1
     assert s2["max_neighbours"] >= 1
+    assert cfg.section("s3_roadmaps")["corpus_path"]
+
+
+def test_streams_missing_s3_section_rejected(tmp_path):
+    p = tmp_path / "streams.yaml"
+    p.write_text("s2_patents: {filing_window_years: 5, max_neighbours: 10}\n")
+    with pytest.raises(ConfigError, match="s3_roadmaps"):
+        load_streams_config(p)
 
 
 def test_streams_missing_s2_section_rejected(tmp_path):

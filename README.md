@@ -45,6 +45,11 @@ Implemented so far:
   critical-tech term sets with word boundaries; each aligned category becomes a
   sub-signal + evidence record listing exactly which terms matched, persisted
   into the same evidence store with public-licence provenance.
+- **Slice 5 (cont.) — S3 roadmaps/standards (L3).** Semantic retrieval over a
+  curated, indexed corpus of roadmaps/standards/regulations to gauge
+  industrial/regulatory pull. Retrieval is via a pluggable `Retriever` (default:
+  a dependency-free, deterministic TF-IDF scorer; an embedding backend can swap
+  in); the top matches become evidence records (public-licence provenance).
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -128,6 +133,9 @@ python scripts/stream_s2_demo.py
 
 # Classify a profile against the EU taxonomy (S4 — deterministic, no network):
 python scripts/stream_s4_demo.py
+
+# Retrieve roadmaps/standards for a profile (S3 — TF-IDF, no network):
+python scripts/stream_s3_demo.py
 ```
 
 ### Tests
@@ -149,6 +157,7 @@ system binaries for the duration of the run. Point them at an existing database
 - `config/llm.yaml` — LLM provider/model/region (no keys; EU-hosting via base_url).
 - `config/streams.yaml` — cross-referencing stream parameters (S2 window/sampling).
 - `config/taxonomy.yaml` — EU-taxonomy term sets for the S4 classifier.
+- `data/s3_corpus.jsonl` — curated roadmaps/standards corpus for the S3 stream.
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -159,8 +168,8 @@ system binaries for the duration of the run. Point them at an existing database
   cross-connector entity resolution is not yet implemented).
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
-- L3 grounded brief drafter and the remaining streams (S3 → S1) + cross-stream
-  agreement/conflict analysis (S2 and S4 are built; framework ready for the rest).
+- L3 grounded brief drafter and the last stream S1 (Dealroom, licensed, built
+  last) + cross-stream agreement/conflict analysis (S2, S4, S3 are built).
 - OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
   names need a biblio follow-up per citing doc — currently fake-only).
 - Wiring profiling/streams into a batch enrichment pass over the store, and a
