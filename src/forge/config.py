@@ -49,9 +49,10 @@ def _read_yaml(path: str | os.PathLike[str]) -> dict:
 
 @dataclass(frozen=True)
 class ScoringConfig:
-    """Validated ventureability weights. Immutable once loaded."""
+    """Validated ventureability weights + optional signal scaling. Immutable."""
 
     weights: dict[str, float]
+    scaling: dict = field(default_factory=dict)
 
     def weight(self, dimension: str) -> float:
         return self.weights[dimension]
@@ -94,7 +95,11 @@ def load_scoring_config(path: str | os.PathLike[str]) -> ScoringConfig:
     if abs(total - 1.0) > _WEIGHT_SUM_TOLERANCE:
         raise ConfigError(f"scoring weights must sum to 1.0, got {total:g}")
 
-    return ScoringConfig(weights=weights)
+    scaling = data.get("scaling", {})
+    if not isinstance(scaling, dict):
+        raise ConfigError("scoring 'scaling' must be a mapping if present")
+
+    return ScoringConfig(weights=weights, scaling=scaling)
 
 
 @dataclass(frozen=True)

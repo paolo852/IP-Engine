@@ -35,6 +35,31 @@ def test_repo_scoring_config_is_valid():
     assert abs(sum(cfg.weights.values()) - 1.0) < 1e-9
 
 
+def test_scoring_scaling_is_loaded():
+    cfg = load_scoring_config(REPO_SCORING)
+    assert cfg.scaling["citation_saturation"] == 5
+    assert cfg.scaling["neighbour_crowded"] == 100
+
+
+def test_scoring_scaling_must_be_mapping(tmp_path):
+    p = _write(
+        tmp_path,
+        "scoring.yaml",
+        """
+        weights:
+          technology_maturity: 0.2
+          market_pull: 0.25
+          ip_defensibility: 0.2
+          capital_intensity: 0.1
+          regulatory_pathway: 0.1
+          team_availability: 0.15
+        scaling: 5
+        """,
+    )
+    with pytest.raises(ConfigError, match="scaling"):
+        load_scoring_config(p)
+
+
 def test_repo_dormancy_config_is_valid():
     cfg = load_dormancy_config(REPO_DORMANCY)
     assert cfg.patents["min_age_years"] == 3

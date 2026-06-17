@@ -57,6 +57,14 @@ Implemented so far:
   spec's conflict (market/regulatory pull into a crowded field with no forward
   citations → licence-or-park) is detected explicitly; every verdict is
   explainable (indicators + agreements + conflicts).
+- **Slice 6 — ventureability scoring (L4).** A transparent, config-weighted
+  6-dimension score (technology_maturity, market_pull, ip_defensibility,
+  capital_intensity, regulatory_pathway, team_availability) — no ML. Each
+  dimension is computed from named stream signals + asset fields by a documented
+  rule and exposes its value, rationale, and the **evidence records** that
+  produced it. Dimensions with no signal yet (capital_intensity, team_availability)
+  are reported **indeterminate** rather than fabricated; the overall score is the
+  weighted mean over scorable dimensions and reports its coverage.
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -73,7 +81,7 @@ Five layers + cross-cutting governance:
   cross-referencing. ← *profiling + grounding scaffolding + the S2 stream here.*
 - **L4 Scoring & clustering** — deterministic dormancy rules, 6-dimension
   ventureability score (configurable weights), sector clustering.
-  ← *dormancy rules implemented here.*
+  ← *dormancy rules + ventureability scoring implemented here.*
 - **L5 Output** — market-context briefs, committee dashboard, decision capture.
 - **Governance** — grounding/audit, RBAC, GDPR/EU-hosting, prompt-injection hygiene.
 
@@ -146,6 +154,9 @@ python scripts/stream_s3_demo.py
 
 # Corroborate S2+S4+S3 into a routing signal (sprint vs licence-or-park):
 python scripts/corroborate_demo.py
+
+# Score ventureability with a full, evidence-backed breakdown (no network):
+python scripts/ventureability_demo.py
 ```
 
 ### Tests
@@ -187,8 +198,8 @@ system binaries for the duration of the run. Point them at an existing database
   real-LLM/real-OPS smoke path (services exist; live runs need credentials).
 - Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
   rule engine exists; wiring it across the DB and recording results is later).
-- L4 ventureability scoring *function* (the **config** exists and is validated;
-  the consuming logic is build-order slice 6).
+- L4 capital_intensity + team_availability dimensions (indeterminate until S1
+  funding / internal team data lands); persisting scores; sector clustering (L4).
 - L5 dashboard and decision/outcome capture; governance (RBAC, EU-hosting).
 
 Build order and full scope live in the project context (`CLAUDE.md` equivalent).

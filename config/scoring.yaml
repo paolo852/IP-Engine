@@ -11,3 +11,12 @@ weights:
   capital_intensity: 0.10
   regulatory_pathway: 0.10
   team_availability: 0.15
+
+# Reference points that map raw stream signals onto each dimension's [0,1] scale.
+# Tunable config (not weights): e.g. how many forward citations count as "fully
+# validated" IP, or how many neighbouring patents count as "fully crowded".
+scaling:
+  market_pull_reference: 3      # S3 roadmap/standard matches for full pull credit
+  filing_slope_reference: 3.0   # filings/yr slope for full field-momentum credit
+  citation_saturation: 5        # forward citations for ~full IP-validation credit
+  neighbour_crowded: 100        # neighbour density treated as fully crowded
