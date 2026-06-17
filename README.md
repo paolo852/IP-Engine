@@ -50,6 +50,13 @@ Implemented so far:
   industrial/regulatory pull. Retrieval is via a pluggable `Retriever` (default:
   a dependency-free, deterministic TF-IDF scorer; an embedding backend can swap
   in); the top matches become evidence records (public-licence provenance).
+- **Slice 5 (cont.) — cross-stream corroboration (L3, the core).** Reads the
+  S2/S4/S3 sub-signals, turns each into a qualitative indicator (config
+  thresholds), then detects **agreement vs conflict** to emit a routing signal
+  (sprint / licence-or-park / watch / park) — *not* averaging numbers. The
+  spec's conflict (market/regulatory pull into a crowded field with no forward
+  citations → licence-or-park) is detected explicitly; every verdict is
+  explainable (indicators + agreements + conflicts).
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -136,6 +143,9 @@ python scripts/stream_s4_demo.py
 
 # Retrieve roadmaps/standards for a profile (S3 — TF-IDF, no network):
 python scripts/stream_s3_demo.py
+
+# Corroborate S2+S4+S3 into a routing signal (sprint vs licence-or-park):
+python scripts/corroborate_demo.py
 ```
 
 ### Tests
@@ -158,6 +168,7 @@ system binaries for the duration of the run. Point them at an existing database
 - `config/streams.yaml` — cross-referencing stream parameters (S2 window/sampling).
 - `config/taxonomy.yaml` — EU-taxonomy term sets for the S4 classifier.
 - `data/s3_corpus.jsonl` — curated roadmaps/standards corpus for the S3 stream.
+- `config/corroboration.yaml` — thresholds for cross-stream agreement/conflict.
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -169,7 +180,7 @@ system binaries for the duration of the run. Point them at an existing database
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
 - L3 grounded brief drafter and the last stream S1 (Dealroom, licensed, built
-  last) + cross-stream agreement/conflict analysis (S2, S4, S3 are built).
+  last); S1 will fold into the existing corroboration as a fourth indicator.
 - OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
   names need a biblio follow-up per citing doc — currently fake-only).
 - Wiring profiling/streams into a batch enrichment pass over the store, and a

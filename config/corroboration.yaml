@@ -1,0 +1,21 @@
+# Cross-stream corroboration thresholds — CONFIG, not code (rule 3).
+# Used by L3 cross-referencing to turn raw stream sub-signals into qualitative
+# indicators, which are then checked for agreement vs conflict. The routing logic
+# itself (the method) lives in code; only these cut-points are configuration.
+
+indicators:
+  field_momentum:        # from S2 filing_trend_slope (filings/year)
+    rising_min_slope: 1.0
+    declining_max_slope: -1.0
+
+  industry_attention:    # from S2 forward_citation_count
+    some_min: 1
+    strong_min: 5
+
+  field_crowding:        # from S2 neighbour_density (patents in the space)
+    moderate_min: 20
+    crowded_min: 100
+
+  market_pull:           # from S3 industrial_regulatory_pull (matched docs)
+    weak_min: 1
+    strong_min: 3

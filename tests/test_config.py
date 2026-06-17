@@ -10,6 +10,7 @@ from forge.config import (
     VENTUREABILITY_DIMENSIONS,
     ConfigError,
     load_connectors_config,
+    load_corroboration_config,
     load_dormancy_config,
     load_llm_config,
     load_organisation_config,
@@ -25,6 +26,7 @@ REPO_ORGANISATION = "config/organisation.yaml"
 REPO_LLM = "config/llm.yaml"
 REPO_STREAMS = "config/streams.yaml"
 REPO_TAXONOMY = "config/taxonomy.yaml"
+REPO_CORROBORATION = "config/corroboration.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -256,3 +258,16 @@ def test_taxonomy_requires_categories(tmp_path):
     p.write_text("eu_taxonomy:\n  strong_match_count: 3\n")
     with pytest.raises(ConfigError, match="categories"):
         load_taxonomy_config(p)
+
+
+def test_repo_corroboration_config_is_valid():
+    cfg = load_corroboration_config(REPO_CORROBORATION)
+    assert cfg.indicator("field_crowding")["crowded_min"] >= 1
+    assert cfg.indicator("market_pull")["strong_min"] >= 1
+
+
+def test_corroboration_missing_indicator_rejected(tmp_path):
+    p = tmp_path / "corroboration.yaml"
+    p.write_text("indicators:\n  field_momentum: {rising_min_slope: 1, declining_max_slope: -1}\n")
+    with pytest.raises(ConfigError, match="industry_attention"):
+        load_corroboration_config(p)

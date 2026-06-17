@@ -228,6 +228,30 @@ def load_streams_config(path: str | os.PathLike[str]) -> StreamsConfig:
 
 
 @dataclass(frozen=True)
+class CorroborationConfig:
+    """Validated thresholds for turning stream sub-signals into indicators."""
+
+    indicators: dict
+
+    def indicator(self, name: str) -> dict:
+        if name not in self.indicators:
+            raise ConfigError(f"no corroboration indicator config for {name!r}")
+        return self.indicators[name]
+
+
+def load_corroboration_config(path: str | os.PathLike[str]) -> CorroborationConfig:
+    """Load + validate cross-stream corroboration thresholds."""
+    data = _read_yaml(path)
+    indicators = data.get("indicators")
+    if not isinstance(indicators, dict):
+        raise ConfigError("corroboration config must have an 'indicators' mapping")
+    for name in ("field_momentum", "industry_attention", "field_crowding", "market_pull"):
+        if not isinstance(indicators.get(name), dict):
+            raise ConfigError(f"corroboration config missing '{name}' thresholds")
+    return CorroborationConfig(indicators=indicators)
+
+
+@dataclass(frozen=True)
 class TaxonomyConfig:
     """Validated EU-taxonomy term sets for the deterministic S4 classifier."""
 
