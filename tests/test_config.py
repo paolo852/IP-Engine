@@ -15,6 +15,7 @@ from forge.config import (
     load_organisation_config,
     load_scoring_config,
     load_streams_config,
+    load_taxonomy_config,
 )
 
 REPO_SCORING = "config/scoring.yaml"
@@ -23,6 +24,7 @@ REPO_CONNECTORS = "config/connectors.yaml"
 REPO_ORGANISATION = "config/organisation.yaml"
 REPO_LLM = "config/llm.yaml"
 REPO_STREAMS = "config/streams.yaml"
+REPO_TAXONOMY = "config/taxonomy.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -225,3 +227,24 @@ def test_streams_missing_s2_section_rejected(tmp_path):
     p.write_text("something_else: {}\n")
     with pytest.raises(ConfigError, match="s2_patents"):
         load_streams_config(p)
+
+
+def test_repo_taxonomy_config_is_valid():
+    cfg = load_taxonomy_config(REPO_TAXONOMY)
+    assert {"green", "digital", "critical_tech"} <= set(cfg.categories)
+    assert cfg.strong_match_count >= 1
+    assert "photonic" in cfg.categories["digital"]["terms"]
+
+
+def test_taxonomy_rejects_category_without_terms(tmp_path):
+    p = tmp_path / "taxonomy.yaml"
+    p.write_text("eu_taxonomy:\n  categories:\n    green:\n      label: Green\n")
+    with pytest.raises(ConfigError, match="non-empty 'terms'"):
+        load_taxonomy_config(p)
+
+
+def test_taxonomy_requires_categories(tmp_path):
+    p = tmp_path / "taxonomy.yaml"
+    p.write_text("eu_taxonomy:\n  strong_match_count: 3\n")
+    with pytest.raises(ConfigError, match="categories"):
+        load_taxonomy_config(p)

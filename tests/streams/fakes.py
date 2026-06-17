@@ -6,10 +6,22 @@ from forge.enrichment.profiling import AssetProfile, GroundedField
 from forge.streams.s2_patents import CitingDoc, SearchResult, YearCount
 
 
-def profile(query_terms: list[str]) -> AssetProfile:
-    g = GroundedField(name="problem", value="p", quote="q", source_field="abstract")
+def profile(
+    query_terms: list[str],
+    *,
+    problem: str = "p",
+    solution: str = "s",
+    applications: tuple[str, ...] = (),
+) -> AssetProfile:
+    def g(name, value):
+        return GroundedField(name=name, value=value, quote="q", source_field="abstract")
+
     return AssetProfile(
-        problem=g, solution=g, applications=[], query_terms=query_terms, model="m"
+        problem=g("problem", problem),
+        solution=g("solution", solution),
+        applications=[g(f"application[{i}]", a) for i, a in enumerate(applications)],
+        query_terms=query_terms,
+        model="m",
     )
 
 

@@ -224,6 +224,43 @@ def load_streams_config(path: str | os.PathLike[str]) -> StreamsConfig:
     return StreamsConfig(sections=data)
 
 
+@dataclass(frozen=True)
+class TaxonomyConfig:
+    """Validated EU-taxonomy term sets for the deterministic S4 classifier."""
+
+    categories: dict  # name -> {"label": str, "terms": tuple[str, ...]}
+    strong_match_count: int
+
+
+def load_taxonomy_config(path: str | os.PathLike[str]) -> TaxonomyConfig:
+    """Load the EU taxonomy. Each category needs a non-empty 'terms' list."""
+    data = _read_yaml(path)
+    root = data.get("eu_taxonomy")
+    if not isinstance(root, dict):
+        raise ConfigError("taxonomy config must have an 'eu_taxonomy' mapping")
+    raw_categories = root.get("categories")
+    if not isinstance(raw_categories, dict) or not raw_categories:
+        raise ConfigError("taxonomy 'eu_taxonomy' needs a non-empty 'categories' mapping")
+
+    categories: dict = {}
+    for name, spec in raw_categories.items():
+        if not isinstance(spec, dict) or not isinstance(spec.get("terms"), list) or not spec["terms"]:
+            raise ConfigError(f"taxonomy category {name!r} needs a non-empty 'terms' list")
+        categories[name] = {
+            "label": str(spec.get("label", name)),
+            "terms": tuple(str(t) for t in spec["terms"]),
+        }
+
+    try:
+        strong = int(root.get("strong_match_count", 3))
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"taxonomy 'strong_match_count' must be an integer: {exc}") from exc
+    if strong < 1:
+        raise ConfigError("taxonomy 'strong_match_count' must be >= 1")
+
+    return TaxonomyConfig(categories=categories, strong_match_count=strong)
+
+
 def load_llm_config(path: str | os.PathLike[str]) -> LLMConfig:
     """Load + validate LLM settings."""
     data = _read_yaml(path)

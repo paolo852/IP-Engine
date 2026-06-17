@@ -1,0 +1,55 @@
+# EU taxonomy for the S4 stream — deterministic classification, CONFIG not code.
+# Editable term sets per EU-priority category (green / digital / critical-tech).
+# Defaults are illustrative; tune for the real EU taxonomy without code changes.
+
+eu_taxonomy:
+  # A category counts as "strongly aligned" once this many distinct terms match;
+  # match_strength scales linearly up to it.
+  strong_match_count: 3
+
+  categories:
+    green:
+      label: "EU Green Deal / environmental sustainability"
+      terms:
+        - solar
+        - photovoltaic
+        - wind turbine
+        - hydrogen
+        - carbon capture
+        - energy efficiency
+        - circular economy
+        - recycling
+        - renewable energy
+        - battery
+        - heat pump
+        - emissions reduction
+        - electrification
+
+    digital:
+      label: "EU digital priorities"
+      terms:
+        - artificial intelligence
+        - machine learning
+        - semiconductor
+        - microelectronics
+        - photonic
+        - optical
+        - quantum
+        - cybersecurity
+        - edge computing
+        - cloud computing
+        - 5g
+        - 6g
+        - data analytics
+
+    critical_tech:
+      label: "EU critical / strategic technologies"
+      terms:
+        - advanced materials
+        - biotechnology
+        - advanced manufacturing
+        - robotics
+        - space technology
+        - sensors
+        - advanced packaging
+        - nanotechnology
