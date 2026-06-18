@@ -54,9 +54,19 @@
     .empty { color:var(--muted); padding:30px; text-align:center; }
     .banner { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:8px 12px;
               border-radius:8px; font-size:13px; margin-bottom:14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    button.busy { opacity:.8; cursor:progress; }
+    button.busy::after { content:""; display:inline-block; width:11px; height:11px;
+      margin-left:8px; vertical-align:-1px; border:2px solid currentColor;
+      border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
+    #busybar { display:none; position:fixed; top:0; left:0; height:3px; width:100%;
+      background:linear-gradient(90deg,#0b5fff,#22c55e,#0b5fff); background-size:200% 100%;
+      animation:busybar 1.1s linear infinite; z-index:50; }
+    @keyframes busybar { from { background-position:0 0; } to { background-position:-200% 0; } }
   </style>
 </head>
 <body>
+  <div id="busybar"></div>
   <header>
     <h1><a href="/">FORGE Mining Engine</a></h1>
     <span class="muted" style="font-size:12px">ranks &amp; evidences dormant assets</span>
@@ -65,5 +75,24 @@
     <span class="role">acting: {{ principal.name }} ({{ principal.role }})</span>
   </header>
   <main>{% block content %}{% endblock %}</main>
+  <script>
+    // Immediate feedback on submit: a top progress bar + a spinning, disabled
+    // button (the ingest/profile/score work is synchronous and takes a few seconds).
+    document.addEventListener("submit", function (e) {
+      var form = e.target;
+      if (form.method && form.method.toLowerCase() !== "post") return;
+      var btn = form.querySelector('button[type="submit"], button:not([type])');
+      var bar = document.getElementById("busybar");
+      if (bar) bar.style.display = "block";
+      if (btn) {
+        // Defer so the button's value still participates in the submission.
+        setTimeout(function () {
+          btn.classList.add("busy");
+          btn.disabled = true;
+          btn.textContent = btn.getAttribute("data-busy") || "Working…";
+        }, 0);
+      }
+    }, true);
+  </script>
 </body>
 </html>
