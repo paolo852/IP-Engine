@@ -447,9 +447,56 @@ def _profiling_provider(config_dir: str):
     return OfflineProfilingProvider()
 
 
+def _stream_clients(config_dir: str):
+    """Build the optional cross-referencing stream clients from the environment.
+
+    S3 (roadmaps) and S4 (taxonomy) always run offline. S2 (EPO OPS patents) is a
+    free source but needs an OAuth2 key; S1 (Dealroom funding) is licensed. Each
+    activates only when its credential is present — absent ones are simply skipped
+    (a failing/missing source never blocks the others, rule 7).
+    """
+    s2_client = s1_client = None
+    if os.environ.get("FORGE_EPO_OPS_KEY"):
+        try:
+            from ..config import load_connectors_config
+            from ..connectors.epo_ops import OpsClient, OpsSettings
+            from ..streams.s2_patents import OpsS2Client
+
+            settings = OpsSettings.from_config(
+                load_connectors_config(f"{config_dir}/connectors.yaml")
+            )
+            s2_client = OpsS2Client(OpsClient(settings))
+        except Exception:  # noqa: BLE001 - S2 is optional; never block scoring
+            s2_client = None
+    if os.environ.get("FORGE_DEALROOM_API_KEY"):
+        try:
+            from ..config import load_streams_config
+            from ..connectors.http import UrllibTransport
+            from ..streams.s1_funding import DealroomS1Client
+
+            base_url = load_streams_config(f"{config_dir}/streams.yaml").section(
+                "s1_funding"
+            )["base_url"]
+            s1_client = DealroomS1Client(UrllibTransport(), base_url=base_url)
+        except Exception:  # noqa: BLE001 - S1 is optional/licensed
+            s1_client = None
+    return s2_client, s1_client
+
+
 def _score_asset(session, asset_ids, config_dir: str) -> None:
-    """Profile, cross-reference and score freshly-added assets."""
+    """Profile, cross-reference and score freshly-added assets.
+
+    Runs S3/S4 always; S2 (free EPO OPS) and S1 (licensed Dealroom) activate when
+    their credentials are configured, enriching the score with real patent and
+    funding signals.
+    """
     from ..pipeline import Pipeline, PipelineConfig
 
     config = PipelineConfig.from_files(config_dir=config_dir)
-    Pipeline(config, _profiling_provider(config_dir)).run(session, asset_ids)
+    s2_client, s1_client = _stream_clients(config_dir)
+    Pipeline(
+        config,
+        _profiling_provider(config_dir),
+        s2_client=s2_client,
+        s1_client=s1_client,
+    ).run(session, asset_ids)
