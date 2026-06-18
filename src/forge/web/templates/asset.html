@@ -195,4 +195,17 @@
     <p class="banner">Acting role <strong>{{ principal.role }}</strong> may not record outcomes.</p>
   {% endif %}
 </div>
+
+{% if can_delete %}
+<!-- remove from pipeline (destructive) ----------------------------------->
+<div class="card" style="border-color:#fecaca">
+  <h2 style="color:#991b1b">Remove from pipeline</h2>
+  <p class="muted" style="margin:0 0 8px">Permanently deletes this asset and everything derived from it (profile, evidence, score, synthesis, decisions, outcomes). Cannot be undone.</p>
+  <form method="post" action="/asset/{{ asset.id }}/delete"
+        onsubmit="return confirm('Delete this asset and all its derived data? This cannot be undone.');">
+    <button type="submit" data-busy="Deleting…"
+            style="background:#b42318;border-color:#b42318">Delete asset</button>
+  </form>
+</div>
+{% endif %}
 {% endblock %}

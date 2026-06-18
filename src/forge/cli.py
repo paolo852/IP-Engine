@@ -44,6 +44,7 @@ COMMAND_PERMISSIONS = {
     "decide": "decide",
     "outcome": "record_outcome",
     "recalibrate": "recalibrate",
+    "delete": "delete_asset",
     "seed": "ingest",
     "serve": "view",
 }
@@ -262,6 +263,17 @@ def cmd_serve(args, session) -> int:
     return 0
 
 
+def cmd_delete(args, session: Session) -> int:
+    from .repository import delete_asset
+
+    removed = delete_asset(session, uuid.UUID(args.asset_id))
+    if not removed:
+        print(f"{args.asset_id}: not found", file=sys.stderr)
+        return 1
+    print(f"deleted {args.asset_id} (and all derived data)")
+    return 0
+
+
 def cmd_recalibrate(args, session: Session) -> int:
     from .config import load_recalibration_config, load_scoring_config
     from .recalibration import run_recalibration
@@ -334,6 +346,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("recalibrate", help="run the recalibration loop")
     p.add_argument("--since-days", type=int, default=None)
     p.set_defaults(func=cmd_recalibrate)
+
+    p = sub.add_parser("delete", help="remove an asset and all its derived data")
+    p.add_argument("asset_id")
+    p.set_defaults(func=cmd_delete)
 
     return parser
 

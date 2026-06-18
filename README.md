@@ -42,6 +42,7 @@ forge dashboard                       # the ranked committee pipeline
 forge decide <asset-id> sprint --by committee@org
 forge outcome <asset-id> licensed --by ops@org
 forge recalibrate --since-days 90     # quarterly calibration check
+forge delete <asset-id>               # remove an asset + all its derived data (admin)
 forge serve                           # run the demo web UI (needs the 'web' extra)
 ```
 

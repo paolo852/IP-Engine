@@ -24,6 +24,7 @@ PERMISSIONS = frozenset(
         "decide",
         "record_outcome",
         "recalibrate",
+        "delete_asset",
         "migrate",
         "admin",
     }

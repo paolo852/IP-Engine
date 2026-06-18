@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from datetime import datetime, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, union
 from sqlalchemy.orm import Session, selectinload
 
 from .db.models import (
@@ -121,6 +121,28 @@ def get_asset(session: Session, asset_id: uuid.UUID) -> Asset | None:
         )
     )
     return session.execute(stmt).scalar_one_or_none()
+
+
+def delete_asset(session: Session, asset_id: uuid.UUID) -> bool:
+    """Remove an asset and everything derived from it.
+
+    All per-asset tables (provenance, evidence, profile, score, synthesis,
+    decisions, outcomes) cascade via ``ON DELETE CASCADE``. Source rows that are
+    left unreferenced afterwards are also cleaned up, so deleting an asset leaves
+    no orphans. Returns True if an asset was actually deleted.
+    """
+    result = session.execute(delete(Asset).where(Asset.id == asset_id))
+    # Drop sources no longer referenced by any provenance / evidence / profile.
+    referenced = union(
+        select(FieldProvenance.source_id),
+        select(Evidence.source_id),
+        select(AssetProfile.source_id),
+    ).subquery()
+    session.execute(
+        delete(Source).where(Source.id.not_in(select(referenced.c.source_id)))
+    )
+    session.commit()
+    return bool(result.rowcount)
 
 
 def provenance_map(asset: Asset) -> dict[str, list[Source]]:

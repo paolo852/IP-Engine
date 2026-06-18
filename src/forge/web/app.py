@@ -40,6 +40,7 @@ from ..repository import (
     AssetBundle,
     GroundingError,
     ProvenanceEntry,
+    delete_asset,
     get_asset,
     get_evidence,
     get_profile,
@@ -378,6 +379,7 @@ def create_app(
                 "principal": principal,
                 "can_decide": _can(principal, "decide"),
                 "can_record_outcome": _can(principal, "record_outcome"),
+                "can_delete": _can(principal, "delete_asset"),
                 "note": note,
             }
             return _TEMPLATES.TemplateResponse(request, "asset.html", ctx)
@@ -447,6 +449,27 @@ def create_app(
         finally:
             session.close()
         return RedirectResponse(url=f"/asset/{asset_id}", status_code=303)
+
+    @app.post("/asset/{asset_id}/delete")
+    def delete(asset_id: str) -> RedirectResponse:
+        principal = _principal()
+        try:
+            authorize(principal, "delete_asset", gov)
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        try:
+            aid = uuid.UUID(asset_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="invalid asset id")
+
+        session = session_factory()
+        try:
+            removed = delete_asset(session, aid)
+        finally:
+            session.close()
+        if not removed:
+            raise HTTPException(status_code=404, detail="asset not found")
+        return RedirectResponse(url="/", status_code=303)
 
     return app
 
