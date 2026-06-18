@@ -107,6 +107,29 @@ The image is platform-agnostic: any container host that injects `FORGE_DATABASE_
 and honours `PORT` (Railway, Render, Fly.io, Cloud Run, a VM…) will run it. Set
 `FORGE_ROLE` to bind the UI's RBAC role; real authentication is deployment-owned.
 
+### Public URL on Render + Supabase
+
+`render.yaml` is a Render Blueprint for a one-click public deploy:
+
+1. **Supabase connection string.** In Supabase → *Project Settings → Database →
+   Connection string → Session pooler*, copy it and adapt to:
+   ```
+   postgresql+psycopg2://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+   ```
+   Note the `postgresql+psycopg2://` scheme (SQLAlchemy), the pooler username
+   `postgres.<project-ref>`, port **5432** (session mode — needed for migrations),
+   and `?sslmode=require`.
+2. **Deploy.** Render → *New → Blueprint* → pick this repo and branch. Render
+   builds the `Dockerfile`; set `FORGE_DATABASE_URL` to the string above when
+   prompted (it is marked `sync: false`, i.e. not stored in the repo).
+3. Render injects `PORT` and the app binds `0.0.0.0` automatically. On first boot
+   it migrates and seeds the synthetic demo, then serves at
+   `https://forge-demo-<hash>.onrender.com`. Health check: `/healthz`.
+
+There is no authentication (deployment-owned): a public `FORGE_ROLE=admin` lets
+visitors record decisions on the synthetic data — set `FORGE_ROLE=viewer` for a
+read-only link. The free plan sleeps when idle; the first request wakes it.
+
 ## End-to-end orchestration
 
 `forge.pipeline.Pipeline` runs the whole method over a batch of assets — for each

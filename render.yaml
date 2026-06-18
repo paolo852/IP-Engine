@@ -1,0 +1,28 @@
+# Render Blueprint for the FORGE demo UI.
+#
+# Render → New → Blueprint → pick this repo/branch. Render builds the Dockerfile
+# and runs the demo. You only need to provide FORGE_DATABASE_URL (your Supabase
+# Postgres). The app migrates and seeds the synthetic demo on first boot.
+#
+# Region 'frankfurt' keeps hosting in the EU (aligns with the governance
+# EU-hosting posture). Free plan sleeps when idle — the first hit wakes it.
+services:
+  - type: web
+    name: forge-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /healthz
+    envVars:
+      # Your Supabase connection string — see the README for the exact format.
+      # Use the SESSION-mode pooler (port 5432) and the postgresql+psycopg2 scheme.
+      - key: FORGE_DATABASE_URL
+        sync: false
+      - key: FORGE_AUTO_MIGRATE
+        value: "1"
+      - key: FORGE_AUTO_SEED
+        value: "1"
+      # Role the public UI acts as. 'admin' lets visitors record decisions/outcomes
+      # (fine for a synthetic demo); set 'viewer' for a read-only public link.
+      - key: FORGE_ROLE
+        value: admin
