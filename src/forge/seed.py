@@ -15,6 +15,7 @@ are simply absent — the score reports its reduced coverage rather than inventi
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -241,6 +242,43 @@ def synthetic_demo_bundles() -> list[AssetBundle]:
     return bundles
 
 
+def build_stream_clients(config_dir: str = "config"):
+    """Build the optional cross-referencing stream clients from the environment.
+
+    S3 (roadmaps) and S4 (taxonomy) always run offline and need nothing here. S2
+    (EPO OPS patents) is a free source that needs an OAuth2 key; S1 (Dealroom
+    funding) is licensed. Each activates only when its credential is present;
+    absent or failing clients are skipped so one source never blocks the rest
+    (rule 7). Returns ``(s2_client, s1_client)``, either of which may be None.
+    """
+    s2_client = s1_client = None
+    if os.environ.get("FORGE_EPO_OPS_KEY"):
+        try:
+            from .config import load_connectors_config
+            from .connectors.epo_ops import OpsClient, OpsSettings
+            from .streams.s2_patents import OpsS2Client
+
+            settings = OpsSettings.from_config(
+                load_connectors_config(f"{config_dir}/connectors.yaml")
+            )
+            s2_client = OpsS2Client(OpsClient(settings))
+        except Exception:  # noqa: BLE001 - S2 is optional; never block scoring
+            s2_client = None
+    if os.environ.get("FORGE_DEALROOM_API_KEY"):
+        try:
+            from .config import load_streams_config
+            from .connectors.http import UrllibTransport
+            from .streams.s1_funding import DealroomS1Client
+
+            base_url = load_streams_config(f"{config_dir}/streams.yaml").section(
+                "s1_funding"
+            )["base_url"]
+            s1_client = DealroomS1Client(UrllibTransport(), base_url=base_url)
+        except Exception:  # noqa: BLE001 - S1 is optional/licensed
+            s1_client = None
+    return s2_client, s1_client
+
+
 @dataclass
 class SeedReport:
     created: int
@@ -305,7 +343,13 @@ def seed_demo(
 
     if run_pipeline and to_score:
         config = PipelineConfig.from_files(as_of=as_of)
-        pipe = Pipeline(config, OfflineProfilingProvider())
+        s2_client, s1_client = build_stream_clients()
+        pipe = Pipeline(
+            config,
+            OfflineProfilingProvider(),
+            s2_client=s2_client,
+            s1_client=s1_client,
+        )
         report = pipe.run(session, to_score)
         for r in report.results:
             if r.score is not None:
