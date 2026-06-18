@@ -14,6 +14,7 @@ from forge.config import (
     load_dormancy_config,
     load_llm_config,
     load_organisation_config,
+    load_recalibration_config,
     load_scoring_config,
     load_streams_config,
     load_taxonomy_config,
@@ -27,6 +28,7 @@ REPO_LLM = "config/llm.yaml"
 REPO_STREAMS = "config/streams.yaml"
 REPO_TAXONOMY = "config/taxonomy.yaml"
 REPO_CORROBORATION = "config/corroboration.yaml"
+REPO_RECALIBRATION = "config/recalibration.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -296,3 +298,18 @@ def test_corroboration_missing_indicator_rejected(tmp_path):
     p.write_text("indicators:\n  field_momentum: {rising_min_slope: 1, declining_max_slope: -1}\n")
     with pytest.raises(ConfigError, match="industry_attention"):
         load_corroboration_config(p)
+
+
+def test_repo_recalibration_config_is_valid():
+    cfg = load_recalibration_config(REPO_RECALIBRATION)
+    assert "spun_out" in cfg.good_outcomes
+    assert "abandoned" in cfg.bad_outcomes
+    assert cfg.min_sample >= 1 and cfg.min_separation > 0
+    assert cfg.outcome_quality["spun_out"] == 1.0
+
+
+def test_recalibration_requires_outcome_lists(tmp_path):
+    p = tmp_path / "recalibration.yaml"
+    p.write_text("outcome_quality:\n  spun_out: 1.0\ngood_outcomes: [spun_out]\n")
+    with pytest.raises(ConfigError, match="bad_outcomes"):
+        load_recalibration_config(p)

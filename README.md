@@ -78,6 +78,12 @@ Implemented so far:
   consumes. The `dashboard` read model returns the ranked pipeline (every asset
   with its latest decision/outcome + score) a UI renders. Humans decide; the
   Engine only records.
+- **Slice 10 — quarterly recalibration loop + log (L5).** Reads decisions vs
+  realised outcomes and asks, transparently, whether the ventureability score
+  separated winners (spun-out/licensed) from losers (parked/abandoned). It
+  reports the separation, proposes a pursue-cutoff, and writes a
+  `recalibration_log` row (sample, stats, verdict, weights snapshot) for audit.
+  It only **proposes** — no black-box learning; humans decide whether to retune.
 
 Everything else (enrichment, scoring, dashboard) is stubbed or not yet present;
 see "What is stubbed" below.
@@ -131,6 +137,7 @@ Five layers + cross-cutting governance:
 | `profile_grounding` | The verbatim quote + asset field grounding each profile statement. |
 | `committee_decision` | The committee's decision + the Engine's routing/score snapshot at decision time. |
 | `asset_outcome` | The realised outcome (licensed / spun-out / parked …), feeding recalibration. |
+| `recalibration_log` | Audit record of each quarterly recalibration run (stats, verdict, weights snapshot). |
 
 Dormancy assessments are a pure computation over these grounded fields
 (`forge.dormancy`), not yet persisted — they are produced and explained on demand.
@@ -179,6 +186,9 @@ python scripts/brief_demo.py
 
 # Capture decisions and print the ranked committee dashboard (throwaway DB):
 python scripts/dashboard_demo.py
+
+# Run the quarterly recalibration loop over synthetic history (throwaway DB):
+python scripts/recalibration_demo.py
 ```
 
 ### Tests
@@ -202,6 +212,7 @@ system binaries for the duration of the run. Point them at an existing database
 - `config/taxonomy.yaml` — EU-taxonomy term sets for the S4 classifier.
 - `data/s3_corpus.jsonl` — curated roadmaps/standards corpus for the S3 stream.
 - `config/corroboration.yaml` — thresholds for cross-stream agreement/conflict.
+- `config/recalibration.yaml` — outcome-quality mapping + recalibration thresholds.
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -221,8 +232,10 @@ system binaries for the duration of the run. Point them at an existing database
 - Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 capital_intensity + team_availability dimensions (indeterminate until S1
-  funding / internal team data lands); persisting scores; sector clustering (L4).
+  funding / internal team data lands); persisting scores; sector clustering
+  (build-order slice 7, not yet built).
 - L5 dashboard UI (the read model is built; the web front-end is out of scope here);
-  quarterly recalibration loop + log (slice 10); governance (RBAC, EU-hosting).
+  recalibration *applying* proposals automatically (it only proposes today);
+  governance (RBAC, EU-hosting).
 
 Build order and full scope live in the project context (`CLAUDE.md` equivalent).

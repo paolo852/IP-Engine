@@ -26,6 +26,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -400,3 +401,33 @@ class AssetOutcome(Base):
 
     asset: Mapped[Asset] = relationship()
     decision: Mapped[CommitteeDecision | None] = relationship()
+
+
+class RecalibrationLog(Base):
+    """An audit record of one quarterly recalibration run.
+
+    Recalibration only *proposes* (humans decide whether to retune). Each run
+    captures the sample it analysed, the calibration statistics, the proposed
+    cutoff, the verdict, and a snapshot of the weights in force — so every
+    recommendation is reproducible and auditable.
+    """
+
+    __tablename__ = "recalibration_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    run_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+    since: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    sample_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    good_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    bad_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    mean_score_good: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mean_score_bad: Mapped[float | None] = mapped_column(Float, nullable=True)
+    separation: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recommended_cutoff: Mapped[float | None] = mapped_column(Float, nullable=True)
+    verdict: Mapped[str] = mapped_column(String(32), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    weights_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)

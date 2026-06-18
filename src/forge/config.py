@@ -312,3 +312,37 @@ def load_llm_config(path: str | os.PathLike[str]) -> LLMConfig:
         max_tokens=max_tokens,
         adaptive_thinking=bool(data.get("adaptive_thinking", True)),
     )
+
+
+@dataclass(frozen=True)
+class RecalibrationConfig:
+    """Validated quarterly-recalibration parameters."""
+
+    outcome_quality: dict
+    good_outcomes: tuple
+    bad_outcomes: tuple
+    min_sample: int
+    min_separation: float
+
+
+def load_recalibration_config(path: str | os.PathLike[str]) -> RecalibrationConfig:
+    """Load + validate recalibration parameters."""
+    data = _read_yaml(path)
+    quality = data.get("outcome_quality")
+    if not isinstance(quality, dict) or not quality:
+        raise ConfigError("recalibration config needs a non-empty 'outcome_quality' mapping")
+    for section in ("good_outcomes", "bad_outcomes"):
+        if not isinstance(data.get(section), list) or not data[section]:
+            raise ConfigError(f"recalibration config needs a non-empty '{section}' list")
+    try:
+        min_sample = int(data.get("min_sample", 4))
+        min_separation = float(data.get("min_separation", 0.1))
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"recalibration thresholds must be numeric: {exc}") from exc
+    return RecalibrationConfig(
+        outcome_quality={str(k): float(v) for k, v in quality.items()},
+        good_outcomes=tuple(str(x) for x in data["good_outcomes"]),
+        bad_outcomes=tuple(str(x) for x in data["bad_outcomes"]),
+        min_sample=min_sample,
+        min_separation=min_separation,
+    )

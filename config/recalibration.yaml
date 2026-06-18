@@ -1,0 +1,18 @@
+# Quarterly recalibration parameters — CONFIG, not code (rule 3).
+# Recalibration only PROPOSES; humans decide whether to retune weights/thresholds.
+
+outcome_quality:        # realised-outcome -> quality in [0, 1] (for reporting)
+  spun_out: 1.0
+  licensed: 0.8
+  in_progress: 0.5
+  parked: 0.2
+  abandoned: 0.0
+  pending: 0.0
+
+# Terminal outcomes used to test whether the Engine score separated winners from
+# losers. (in_progress / pending are not yet terminal and are excluded.)
+good_outcomes: [spun_out, licensed]
+bad_outcomes: [parked, abandoned]
+
+min_sample: 4          # fewer decided+realised assets than this -> insufficient data
+min_separation: 0.1    # mean(good score) - mean(bad score) below this -> needs review
