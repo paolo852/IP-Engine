@@ -20,6 +20,7 @@ from .db.models import (
     AssetOutcome,
     AssetProfile,
     AssetScore,
+    AssetSynthesis,
     CommitteeDecision,
     DecisionType,
     Evidence,
@@ -371,3 +372,29 @@ def get_score(session: Session, asset_id: uuid.UUID) -> AssetScore | None:
 
 def delete_score(session: Session, asset_id: uuid.UUID) -> None:
     session.execute(delete(AssetScore).where(AssetScore.asset_id == asset_id))
+
+
+# -- decision synthesis (the committee's first read) ------------------------
+def save_synthesis(session: Session, asset: Asset, synthesis) -> AssetSynthesis:
+    """Persist (or replace) the latest decision-oriented synthesis for an asset."""
+    delete_synthesis(session, asset.id)
+    row = AssetSynthesis(
+        asset_id=asset.id,
+        recommendation=(synthesis.recommendation or "").replace("\x00", ""),
+        summary=(synthesis.summary or "").replace("\x00", ""),
+        open_questions=[q.replace("\x00", "") for q in synthesis.open_questions],
+        basis=list(getattr(synthesis, "basis", []) or []),
+        model=synthesis.model,
+    )
+    session.add(row)
+    session.commit()
+    return row
+
+
+def get_synthesis(session: Session, asset_id: uuid.UUID) -> AssetSynthesis | None:
+    stmt = select(AssetSynthesis).where(AssetSynthesis.asset_id == asset_id)
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def delete_synthesis(session: Session, asset_id: uuid.UUID) -> None:
+    session.execute(delete(AssetSynthesis).where(AssetSynthesis.asset_id == asset_id))

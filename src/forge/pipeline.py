@@ -50,6 +50,7 @@ from .repository import (
     save_profile,
     save_score,
     save_stream_result,
+    save_synthesis,
 )
 from .scoring import ScoringInputs, VentureabilityScore, score_ventureability
 from .streams.base import StreamResult
@@ -92,6 +93,7 @@ class AssetPipelineResult:
     corroboration: Corroboration | None = None
     score: VentureabilityScore | None = None
     brief: MarketContextBrief | None = None
+    synthesis: object | None = None  # forge.output.synthesis.DecisionSynthesis
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -199,6 +201,28 @@ class Pipeline:
             except Exception as exc:  # noqa: BLE001
                 session.rollback()
                 result.errors.append(f"persist-score: {exc}")
+
+        # Decision-oriented synthesis (LLM over the engine's signals). Best-effort:
+        # absent without a capable LLM, and a failure never blocks the rest.
+        try:
+            from .output.synthesis import SynthesisInputs, build_synthesis
+
+            result.synthesis = build_synthesis(
+                SynthesisInputs(
+                    asset=asset,
+                    profile=result.profile,
+                    score=result.score,
+                    corroboration=result.corroboration,
+                    stream_results=result.stream_results,
+                    dormancy=result.dormancy,
+                ),
+                self.provider,
+            )
+            if result.synthesis is not None:
+                save_synthesis(session, asset, result.synthesis)
+        except Exception as exc:  # noqa: BLE001
+            session.rollback()
+            result.errors.append(f"synthesis: {exc}")
 
         return result
 

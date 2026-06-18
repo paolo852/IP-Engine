@@ -15,6 +15,7 @@ from ._pg import PostgresUnavailable, start_embedded
 
 _TABLES = (
     "recalibration_log",
+    "asset_synthesis",
     "asset_score",
     "asset_outcome",
     "committee_decision",

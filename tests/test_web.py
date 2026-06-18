@@ -327,3 +327,39 @@ def test_raw_profile_is_collapsed_search_basis(client, seeded):
     # The paraphrase is demoted to an expandable "search basis", not the headline.
     assert "Search basis" in detail
     assert "<details>" in detail
+
+
+def test_detail_shows_decision_view_when_synthesis_present(client, session):
+    from forge.db.models import AssetSynthesis
+    from forge.repository import save_asset, save_score, save_synthesis
+
+    from .synthetic.assets import synthetic_patent_bundle
+
+    class _Synth:
+        recommendation = "License to an instrument maker"
+        summary = "Three plausible measurement markets; capital-intensive."
+        open_questions = ["Who pays for the resolution gain?"]
+        model = "fake-synth"
+        basis = ["SCORE: ventureability 0.50 (coverage 60%)"]
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    save_score(session, asset, _ventureability(0.5, 0.7), routing="license")
+    save_synthesis(session, asset, _Synth())
+
+    detail = client.get(f"/asset/{asset.id}").text
+    assert "Decision view" in detail
+    assert "License to an instrument maker" in detail
+    assert "Open questions" in detail
+    assert "Who pays for the resolution gain?" in detail
+
+
+def test_dashboard_marks_low_evidence_as_review(client, session):
+    from forge.repository import save_asset, save_score
+
+    from .synthetic.assets import synthetic_patent_bundle
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    save_score(session, asset, _ventureability(0.6, 0.2), routing="sprint")  # below floor
+    home = client.get("/").text
+    # The confident routing is replaced by a "review" marker for the committee.
+    assert ">review<" in home

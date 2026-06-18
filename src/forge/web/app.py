@@ -44,6 +44,7 @@ from ..repository import (
     get_evidence,
     get_profile,
     get_score,
+    get_synthesis,
     latest_decision,
     latest_outcome,
     save_asset,
@@ -107,6 +108,7 @@ def create_app(
                 "rows": rows,
                 "principal": principal,
                 "mode": gov.mode,
+                "min_coverage": min_coverage,
                 "can_ingest": _can(principal, "ingest"),
             },
         )
@@ -364,6 +366,7 @@ def create_app(
                 "provenance": list(asset.provenance),
                 "dormancy": dormancy,
                 "profile": get_profile(session, aid),
+                "synthesis": get_synthesis(session, aid),
                 "score": score,
                 "low_evidence": low_evidence,
                 "min_coverage": min_coverage,

@@ -26,9 +26,14 @@
   </thead>
   <tbody>
     {% for r in rows %}
+    {% set review = r.needs_review(min_coverage) %}
     <tr>
       <td class="score">{% if r.engine_score is not none %}{{ "%.2f"|format(r.engine_score) }}{% else %}—{% endif %}</td>
-      <td>{% if r.engine_routing %}<span class="pill {{ r.engine_routing }}">{{ r.engine_routing }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>
+        {% if review %}<span class="pill watch" title="evidence-poor — provisional">review</span>
+        {% elif r.engine_routing %}<span class="pill {{ r.engine_routing }}">{{ r.engine_routing }}</span>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
       <td><a class="asset" href="/asset/{{ r.asset_id }}">{{ r.title or "(untitled)" }}</a></td>
       <td>{% if r.decision %}<span class="pill {{ r.decision }}">{{ r.decision }}</span>{% else %}<span class="muted">pending</span>{% endif %}</td>
       <td>{{ r.outcome or "—" }}</td>

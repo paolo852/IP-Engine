@@ -83,10 +83,17 @@ class DashboardRow:
     decision: str | None
     decided_by: str | None
     outcome: str | None
+    engine_coverage: float | None = None
 
     @property
     def reviewed(self) -> bool:
         return self.decision is not None
+
+    def needs_review(self, min_coverage: float) -> bool:
+        """True when the score is too evidence-poor to trust as a ranking."""
+        return self.engine_score is None or self.engine_coverage is None or (
+            self.engine_coverage < min_coverage
+        )
 
 
 def dashboard(session: Session) -> list[DashboardRow]:
@@ -133,6 +140,7 @@ def dashboard(session: Session) -> list[DashboardRow]:
                 asset_type=asset.asset_type.value,
                 engine_score=engine_score,
                 engine_routing=engine_routing,
+                engine_coverage=sc.coverage if sc else (dec.engine_coverage if dec else None),
                 decision=dec.decision.value if dec else None,
                 decided_by=dec.decided_by if dec else None,
                 outcome=out.outcome.value if out else None,

@@ -47,11 +47,16 @@ forge serve                           # run the demo web UI (needs the 'web' ext
 
 ## Demo web UI
 
-A server-rendered FastAPI app presents the engine's output: the ranked committee
-dashboard, and per-asset detail with the transparent ventureability breakdown,
-dormancy verdict, grounded problem/solution (with verbatim quotes), cross-stream
-evidence (each with its provenance), and forms for the committee to record
-decisions/outcomes. Three ways to bring in an asset (all need the `ingest`
+A server-rendered FastAPI app presents the engine's output the way a committee
+reads it: a **decision view** first (the LLM's market-framed recommendation +
+open questions for the first sprint gate, derived from the engine's own signals —
+analysis, not a fact), then the transparent ventureability breakdown, dormancy
+verdict, cross-stream evidence (each with its provenance), and forms to record
+decisions/outcomes. The raw grounded problem/solution is demoted to a collapsed
+"search basis" — it is the engine's *input* (it drives the market queries), not
+the deliverable. Coverage is treated as a signal: an evidence-poor score is shown
+as **provisional — needs human review** (dashboard marks it `review`) instead of a
+confident-looking half-number. Three ways to bring in an asset (all need the `ingest`
 permission and apply governance — `development` accepts only public/free/synthetic
 data, rule 4):
 
@@ -298,6 +303,7 @@ Five layers + cross-cutting governance:
 | `asset_profile` | LLM-derived `{problem, solution, applications}` profile (internal-licence source). |
 | `profile_grounding` | The verbatim quote + asset field grounding each profile statement. |
 | `asset_score` | The latest persisted ventureability score (value, coverage, routing, per-dimension breakdown) — one row per asset, replaced on re-score. |
+| `asset_synthesis` | The decision-oriented reading shown first (LLM recommendation, market summary, open questions) — derived from the engine's signals, advisory not a claim. One row per asset; absent without a capable LLM. |
 | `committee_decision` | The committee's decision + the Engine's routing/score snapshot at decision time. |
 | `asset_outcome` | The realised outcome (licensed / spun-out / parked …), feeding recalibration. |
 | `recalibration_log` | Audit record of each quarterly recalibration run (stats, verdict, weights snapshot). |
