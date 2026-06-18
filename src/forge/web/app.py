@@ -148,6 +148,8 @@ def create_app(
         except AuthorizationError as exc:
             raise HTTPException(status_code=403, detail=str(exc))
 
+        from urllib.parse import quote
+
         session = session_factory()
         try:
             bundle = _bundle_from_form(
@@ -160,16 +162,24 @@ def create_app(
             )
             asset = save_asset(session, bundle, policy=gov)
             asset_id = asset.id
-            _score_asset(session, [asset_id], config_dir)
         except (DataProtectionError, GroundingError, GovernanceError, ValueError) as exc:
             session.rollback()
-            # Bounce back to the form with a readable message (governance/grounding).
-            from urllib.parse import quote
-
+            session.close()
             return RedirectResponse(url=f"/new?error={quote(str(exc))}", status_code=303)
+        except Exception as exc:  # noqa: BLE001 - surface, don't 500 into a blank page
+            session.rollback()
+            session.close()
+            return RedirectResponse(url=f"/new?error={quote(f'unexpected: {exc}')}", status_code=303)
+
+        score_note = ""
+        try:
+            _score_asset(session, [asset_id], config_dir)
+        except Exception as exc:  # noqa: BLE001 - scoring is best-effort
+            session.rollback()
+            score_note = f"?note={quote(f'Saved, but scoring incomplete: {exc}')}"
         finally:
             session.close()
-        return RedirectResponse(url=f"/asset/{asset_id}", status_code=303)
+        return RedirectResponse(url=f"/asset/{asset_id}{score_note}", status_code=303)
 
     @app.get("/upload", response_class=HTMLResponse)
     def upload_form(request: Request, error: str | None = None) -> HTMLResponse:
@@ -207,22 +217,34 @@ def create_app(
             return RedirectResponse(url=f"/upload?error={quote(str(exc))}", status_code=303)
 
         session = session_factory()
+        score_note = ""
         try:
             bundle = _bundle_from_parsed(parsed, file.filename or "document", licence)
             asset = save_asset(session, bundle, policy=gov)
             asset_id = asset.id
-            _score_asset(session, [asset_id], config_dir)
         except (DataProtectionError, GroundingError, GovernanceError, ValueError) as exc:
             session.rollback()
+            session.close()
             return RedirectResponse(url=f"/upload?error={quote(str(exc))}", status_code=303)
+        except Exception as exc:  # noqa: BLE001 - surface, don't 500 into a blank page
+            session.rollback()
+            session.close()
+            return RedirectResponse(url=f"/upload?error={quote(f'unexpected: {exc}')}", status_code=303)
+
+        # The asset is stored; scoring is best-effort so an LLM/source hiccup never
+        # discards it — land on the asset page with a note if scoring was partial.
+        try:
+            _score_asset(session, [asset_id], config_dir)
+        except Exception as exc:  # noqa: BLE001
+            session.rollback()
+            score_note = f" Scoring incomplete: {exc}."
         finally:
             session.close()
 
-        # Carry the (explainable) classification onto the detail page as a banner.
         note = quote(
             f"Classified as {parsed.classification.label} — "
             f"{', '.join(parsed.classification.reasons[:3])}. "
-            "Fields were auto-extracted; review them below."
+            "Fields were auto-extracted; review them below." + score_note
         )
         return RedirectResponse(url=f"/asset/{asset_id}?note={note}", status_code=303)
 
