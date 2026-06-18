@@ -9,6 +9,24 @@ hosted-LLM calls + a transparent scoring model + a light interface. The value is
 the **method** — the four streams, the grounding rule, the scoring rubric, the
 routing logic — not novel algorithms.
 
+## CLI
+
+Installing the package registers a `forge` command (DB URL from
+`FORGE_DATABASE_URL`; LLM/OPS/Dealroom credentials from the environment):
+
+```bash
+forge db upgrade                      # run migrations to head
+forge ingest-epo EP1000000            # ingest patents via EPO OPS (needs key)
+forge assets                          # list ingested assets
+forge dormancy --all                  # assess dormancy
+forge pipeline --all                  # run the whole pipeline over the store
+forge cluster                         # group profiled assets into sector portfolios
+forge dashboard                       # the ranked committee pipeline
+forge decide <asset-id> sprint --by committee@org
+forge outcome <asset-id> licensed --by ops@org
+forge recalibrate --since-days 90     # quarterly calibration check
+```
+
 ## End-to-end orchestration
 
 `forge.pipeline.Pipeline` runs the whole method over a batch of assets — for each

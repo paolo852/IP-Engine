@@ -12,6 +12,9 @@ dependencies = [
     "anthropic>=0.40",
 ]
 
+[project.scripts]
+forge = "forge.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
