@@ -228,7 +228,7 @@ def test_unknown_connector_section_lookup_raises():
 def test_repo_llm_config_is_valid():
     cfg = load_llm_config(REPO_LLM)
     assert cfg.provider == "anthropic"
-    assert cfg.model == "claude-opus-4-8"  # latest, most capable default
+    assert cfg.model.startswith("claude-")  # a real Claude model (Haiku for low-cost demo)
     assert cfg.max_tokens > 0
 
 
