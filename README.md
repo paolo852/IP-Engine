@@ -84,6 +84,29 @@ forge serve             # the UI reads/writes that database
 Vercel hosts static/serverless frontends, not this Python app; run `forge serve`
 on any Python host (or container) and point it at the Supabase database.
 
+### One-command container deploy
+
+A `Dockerfile` + `scripts/entrypoint.sh` package the UI so a single command runs
+it against any external Postgres. The entrypoint can migrate and seed on boot
+(`FORGE_AUTO_MIGRATE=1`, `FORGE_AUTO_SEED=1`):
+
+```bash
+# Local, with docker compose (set FORGE_DATABASE_URL in .env first):
+cp .env.example .env        # point FORGE_DATABASE_URL at your Supabase project
+docker compose up --build   # migrates + seeds + serves on http://localhost:8000
+
+# Or plain docker against a remote DB:
+docker build -t forge-demo .
+docker run -p 8000:8000 \
+  -e FORGE_DATABASE_URL="postgresql+psycopg2://postgres:<pwd>@db.<ref>.supabase.co:5432/postgres?sslmode=require" \
+  -e FORGE_AUTO_MIGRATE=1 -e FORGE_AUTO_SEED=1 \
+  forge-demo
+```
+
+The image is platform-agnostic: any container host that injects `FORGE_DATABASE_URL`
+and honours `PORT` (Railway, Render, Fly.io, Cloud Run, a VM…) will run it. Set
+`FORGE_ROLE` to bind the UI's RBAC role; real authentication is deployment-owned.
+
 ## End-to-end orchestration
 
 `forge.pipeline.Pipeline` runs the whole method over a batch of assets — for each

@@ -312,8 +312,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("seed", help="load synthetic demo assets and score them offline").set_defaults(func=cmd_seed)
 
     p = sub.add_parser("serve", help="run the demo web UI")
-    p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8000)
+    # Defaults come from the environment so a container can just run `forge serve`.
+    p.add_argument("--host", default=os.environ.get("FORGE_HOST", "127.0.0.1"))
+    p.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     p.set_defaults(func=cmd_serve, needs_db=False)
 
     p = sub.add_parser("decide", help="record a committee decision")

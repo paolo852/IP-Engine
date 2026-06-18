@@ -1,0 +1,18 @@
+# Run the FORGE demo UI against an external Postgres (e.g. a Supabase project).
+#
+#   cp .env.example .env   # set FORGE_DATABASE_URL to your Supabase connection
+#   docker compose up --build
+#
+# Then open http://localhost:8000. Set FORGE_AUTO_MIGRATE/FORGE_AUTO_SEED=1 in
+# .env to migrate and load the synthetic demo on first boot.
+services:
+  forge:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      FORGE_DATABASE_URL: ${FORGE_DATABASE_URL}
+      FORGE_AUTO_MIGRATE: ${FORGE_AUTO_MIGRATE:-1}
+      FORGE_AUTO_SEED: ${FORGE_AUTO_SEED:-1}
+      FORGE_ROLE: ${FORGE_ROLE:-admin}
+      FORGE_GOVERNANCE_CONFIG: ${FORGE_GOVERNANCE_CONFIG:-config/governance.yaml}
