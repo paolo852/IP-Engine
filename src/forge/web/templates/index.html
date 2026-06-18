@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}FORGE — committee dashboard{% endblock %}
 {% block content %}
-<h2 style="font-size:18px;margin:0 0 4px">Committee dashboard</h2>
+<div style="display:flex;align-items:center;gap:12px;margin:0 0 4px">
+  <h2 style="font-size:18px;margin:0">Committee dashboard</h2>
+  <span style="flex:1"></span>
+  {% if can_ingest %}<a href="/new" style="text-decoration:none"><button type="button">+ Add asset</button></a>{% endif %}
+</div>
 <p class="muted" style="margin:0 0 18px">
   Assets ranked by ventureability. The engine ranks and evidences; humans decide.
 </p>

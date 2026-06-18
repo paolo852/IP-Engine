@@ -123,3 +123,61 @@ def test_viewer_detail_hides_decision_form(client, seeded, monkeypatch):
     r = client.get(f"/asset/{asset.id}")
     assert r.status_code == 200
     assert "may not record decisions" in r.text
+
+
+_PATENT_FORM = {
+    "title": "Solid-state lithium battery with sulfide electrolyte",
+    "source_locator": "https://patents.google.com/patent/EP3000000A1",
+    "licence": "public",
+    "asset_type": "patent",
+    "abstract": "A solid-state lithium battery reduces dendrite formation at high "
+                "current density. The cell improves cycle life for grid storage.",
+    "claims_or_description": "A battery cell comprising a sulfide glass electrolyte "
+                            "and a lithium-stabilising additive between cathode and anode.",
+    "legal_status": "granted",
+    "fee_status": "active",
+    "priority_date": "2014-09-10",
+    "filing_date": "2015-09-01",
+    "grant_date": "2018-11-12",
+    "inventors": "M. Rossi, L. Bianchi",
+    "owners": "Example Research Institute",
+}
+
+
+def test_add_patent_profiles_scores_and_grounds(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    r = client.post("/new", data=_PATENT_FORM, follow_redirects=False)
+    assert r.status_code == 303
+    location = r.headers["location"]
+    assert location.startswith("/asset/")
+
+    # The detail page (a fresh session) shows a persisted score with breakdown and
+    # grounded provenance — proving the whole add → profile → score path committed.
+    detail = client.get(location).text
+    assert "Ventureability" in detail
+    assert "technology_maturity" in detail            # score breakdown persisted
+    assert "patents.google.com/patent/EP3000000A1" in detail  # provenance source
+    assert "no source → no claim" in detail
+
+
+def test_add_asset_appears_on_dashboard(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    client.post("/new", data=_PATENT_FORM, follow_redirects=False)
+    home = client.get("/").text
+    assert "Solid-state lithium battery" in home
+
+
+def test_viewer_cannot_add_asset(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "viewer")
+    assert client.get("/new").status_code == 403
+    assert client.post("/new", data=_PATENT_FORM,
+                       follow_redirects=False).status_code == 403
+
+
+def test_add_asset_rejects_restricted_licence(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    bad = {**_PATENT_FORM, "licence": "licensed_dealroom"}
+    r = client.post("/new", data=bad, follow_redirects=False)
+    # Governance (rule 4) bounces it back to the form with an error, nothing stored.
+    assert r.status_code == 303 and r.headers["location"].startswith("/new?error=")
+    assert "Solid-state lithium battery" not in client.get("/").text

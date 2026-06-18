@@ -51,7 +51,11 @@ A server-rendered FastAPI app presents the engine's output: the ranked committee
 dashboard, and per-asset detail with the transparent ventureability breakdown,
 dormancy verdict, grounded problem/solution (with verbatim quotes), cross-stream
 evidence (each with its provenance), and forms for the committee to record
-decisions/outcomes. It only *presents* what the engine persisted — no scoring or
+decisions/outcomes. An **Add asset** form (`/new`, requires the `ingest`
+permission) lets you load a patent from the literature — paste its title,
+abstract, claim text, status and a source URL — and the engine profiles,
+cross-references and scores it on the spot (offline). Governance applies: in
+`development` only public/free/synthetic data is accepted (rule 4). It only *presents* what the engine persisted — no scoring or
 grounding logic lives in the web layer, so the UI can never diverge from the
 method. Writes are RBAC-gated by the same governance policy as the CLI (role from
 `FORGE_ROLE`).

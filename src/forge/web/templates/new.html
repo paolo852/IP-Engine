@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Add asset — FORGE{% endblock %}
+{% block content %}
+<p class="back"><a href="/">&larr; dashboard</a></p>
+<h2 style="font-size:19px;margin:0 0 2px">Add an asset</h2>
+<p class="muted" style="margin:0 0 16px">
+  Load a patent from the literature (e.g. a published EP/US patent) or a synthetic
+  example. The engine will profile, cross-reference and score it.
+</p>
+
+{% if error %}<div class="banner" style="margin-bottom:16px"><strong>Couldn't save:</strong> {{ error }}</div>{% endif %}
+
+<div class="banner" style="background:#eef2ff;border-color:#c7d2fe;color:#3730a3;margin-bottom:18px">
+  Mode <strong>{{ mode }}</strong>: only <strong>public / free / synthetic</strong> data may be
+  stored (rule 4). Use a published patent or an invented example — not real
+  confidential disclosures.
+</div>
+
+<form method="post" action="/new">
+  <div class="card">
+    <h2>Identity</h2>
+    <div class="dim"><span class="name">Title *</span>
+      <input name="title" required style="flex:1;min-width:280px"
+             placeholder="e.g. Method and apparatus for solid-state battery cooling"></div>
+    <div class="dim"><span class="name">Type</span>
+      <select name="asset_type">
+        {% for t in asset_types %}<option value="{{ t.value }}" {{ 'selected' if t.value=='patent' else '' }}>{{ t.value }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="dim"><span class="name">Source (URL/ref) *</span>
+      <input name="source_locator" required style="flex:1;min-width:280px"
+             placeholder="e.g. https://patents.google.com/patent/EP1234567A1"></div>
+    <div class="dim"><span class="name">Licence</span>
+      <select name="licence">
+        {% for l in licences %}<option value="{{ l.value }}" {{ 'selected' if l.value=='public' else '' }}>{{ l.value }}</option>{% endfor %}
+      </select>
+      <span class="why">how the source data may be used (governs storage)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Text (what the engine profiles &amp; grounds)</h2>
+    <p class="muted" style="margin:0 0 8px">Paste the patent's abstract and a claim/description. The richer the text, the better the profile and score.</p>
+    <textarea name="abstract" rows="3" style="width:100%;margin-bottom:10px"
+              placeholder="Abstract — the problem the invention addresses…"></textarea>
+    <textarea name="claims_or_description" rows="4" style="width:100%"
+              placeholder="Claim 1 / description — the solution…"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>Patent status (drives dormancy &amp; maturity)</h2>
+    <div class="dim"><span class="name">Legal status</span>
+      <input name="legal_status" placeholder="granted / pending / lapsed"></div>
+    <div class="dim"><span class="name">Fee status</span>
+      <input name="fee_status" placeholder="active / lapsing / lapsed"></div>
+    <div class="dim"><span class="name">Priority date</span><input type="date" name="priority_date"></div>
+    <div class="dim"><span class="name">Filing date</span><input type="date" name="filing_date"></div>
+    <div class="dim"><span class="name">Grant date</span><input type="date" name="grant_date"></div>
+  </div>
+
+  <div class="card">
+    <h2>People (optional)</h2>
+    <div class="dim"><span class="name">Inventors</span>
+      <input name="inventors" placeholder="comma-separated" style="flex:1;min-width:260px"></div>
+    <div class="dim"><span class="name">Owners</span>
+      <input name="owners" placeholder="comma-separated" style="flex:1;min-width:260px"></div>
+  </div>
+
+  <button type="submit">Add &amp; score asset</button>
+  <a href="/" class="back" style="margin-left:12px">cancel</a>
+</form>
+{% endblock %}

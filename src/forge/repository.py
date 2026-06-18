@@ -358,7 +358,9 @@ def save_score(
         ],
     )
     session.add(row)
-    session.flush()
+    # Commit (like save_profile/save_stream_result) so a single-asset run — e.g.
+    # adding one asset via the web UI — durably persists its score.
+    session.commit()
     return row
 
 
