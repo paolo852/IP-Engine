@@ -19,3 +19,7 @@ indicators:
   market_pull:           # from S3 industrial_regulatory_pull (matched docs)
     weak_min: 1
     strong_min: 3
+
+  capital_flow:          # from S1 funding_momentum (total funding, EUR)
+    weak_min: 1000000
+    strong_min: 10000000

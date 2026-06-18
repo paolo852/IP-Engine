@@ -229,6 +229,8 @@ def load_streams_config(path: str | os.PathLike[str]) -> StreamsConfig:
     s3 = data.get("s3_roadmaps")
     if not isinstance(s3, dict) or not s3.get("corpus_path"):
         raise ConfigError("streams config must have 's3_roadmaps' with a 'corpus_path'")
+    if not isinstance(data.get("s1_funding"), dict):
+        raise ConfigError("streams config must have an 's1_funding' mapping")
     return StreamsConfig(sections=data)
 
 
@@ -250,7 +252,9 @@ def load_corroboration_config(path: str | os.PathLike[str]) -> CorroborationConf
     indicators = data.get("indicators")
     if not isinstance(indicators, dict):
         raise ConfigError("corroboration config must have an 'indicators' mapping")
-    for name in ("field_momentum", "industry_attention", "field_crowding", "market_pull"):
+    for name in (
+        "field_momentum", "industry_attention", "field_crowding", "market_pull", "capital_flow",
+    ):
         if not isinstance(indicators.get(name), dict):
             raise ConfigError(f"corroboration config missing '{name}' thresholds")
     return CorroborationConfig(indicators=indicators)

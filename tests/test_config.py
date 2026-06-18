@@ -259,6 +259,21 @@ def test_streams_missing_s3_section_rejected(tmp_path):
         load_streams_config(p)
 
 
+def test_streams_missing_s1_section_rejected(tmp_path):
+    p = tmp_path / "streams.yaml"
+    p.write_text(
+        "s2_patents: {filing_window_years: 5, max_neighbours: 10}\n"
+        "s3_roadmaps: {corpus_path: data/s3_corpus.jsonl}\n"
+    )
+    with pytest.raises(ConfigError, match="s1_funding"):
+        load_streams_config(p)
+
+
+def test_repo_streams_has_s1_funding():
+    cfg = load_streams_config(REPO_STREAMS)
+    assert cfg.section("s1_funding")["funding_window_years"] >= 1
+
+
 def test_streams_missing_s2_section_rejected(tmp_path):
     p = tmp_path / "streams.yaml"
     p.write_text("something_else: {}\n")

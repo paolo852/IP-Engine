@@ -50,6 +50,13 @@ Implemented so far:
   industrial/regulatory pull. Retrieval is via a pluggable `Retriever` (default:
   a dependency-free, deterministic TF-IDF scorer; an embedding backend can swap
   in); the top matches become evidence records (public-licence provenance).
+- **Slice 5 (cont.) — S1 funding flows (L3; LICENSED, built last).** Aggregates
+  recent funding rounds in the problem space (Dealroom/Crunchbase) into total
+  funding, round count, and active investors. **Licence separation (rule 5):**
+  only derived aggregates are persisted as evidence (`licensed_dealroom` source,
+  pointer locator); raw per-round records stay in memory and are never stored.
+  Folds into corroboration as a `capital_flow` indicator (and the "capital into a
+  crowded field with no citations" conflict) and into the `market_pull` score.
 - **Slice 5 (cont.) — cross-stream corroboration (L3, the core).** Reads the
   S2/S4/S3 sub-signals, turns each into a qualitative indicator (config
   thresholds), then detects **agreement vs conflict** to emit a routing signal
@@ -175,6 +182,9 @@ python scripts/stream_s4_demo.py
 # Retrieve roadmaps/standards for a profile (S3 — TF-IDF, no network):
 python scripts/stream_s3_demo.py
 
+# Aggregate funding flows (S1 — derived/licensed only, no key/network):
+python scripts/stream_s1_demo.py
+
 # Corroborate S2+S4+S3 into a routing signal (sprint vs licence-or-park):
 python scripts/corroborate_demo.py
 
@@ -223,8 +233,9 @@ system binaries for the duration of the run. Point them at an existing database
   cross-connector entity resolution is not yet implemented).
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
-- The last stream S1 (Dealroom, licensed, built last); S1 will fold into the
-  existing corroboration as a fourth indicator and S1 evidence into the brief.
+- A live Dealroom-backed S1 client path (the stream + parser exist and are
+  network-isolated; live runs need a licence key) and folding S1 evidence into
+  the brief inputs.
 - OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
   names need a biblio follow-up per citing doc — currently fake-only).
 - Wiring profiling/streams into a batch enrichment pass over the store, and a

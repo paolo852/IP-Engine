@@ -31,6 +31,7 @@ _DEFAULT_SCALING = {
     "filing_slope_reference": 3.0,
     "citation_saturation": 5,
     "neighbour_crowded": 100,
+    "funding_reference_eur": 10_000_000,
 }
 
 
@@ -123,25 +124,29 @@ def _market_pull(inp: ScoringInputs, sc: dict) -> DimensionScore:
     r = inp.stream_results
     pull = _signal(r, "industrial_regulatory_pull")
     slope = _signal(r, "filing_trend_slope")
+    funding = _signal(r, "funding_momentum")
     aligned = bool(_aligned_categories(r))
 
     components: list[tuple[float, float]] = []
     if pull is not None:
-        components.append((0.5, clamp_unit(pull / sc["market_pull_reference"])))
+        components.append((0.4, clamp_unit(pull / sc["market_pull_reference"])))
+    if funding is not None:
+        components.append((0.4, clamp_unit(funding / sc["funding_reference_eur"])))
     if slope is not None:
         components.append((0.3, clamp_unit(max(slope, 0.0) / sc["filing_slope_reference"])))
     if aligned:
         components.append((0.2, 1.0))
 
     if not components:
-        return DimensionScore("market_pull", None, "no S3/S4/S2 pull signals", [])
-    evidence = _evidence(r, {"S3_roadmaps", "S4_taxonomy"}) + _evidence(
+        return DimensionScore("market_pull", None, "no S1/S2/S3/S4 pull signals", [])
+    evidence = _evidence(r, {"S1_funding", "S3_roadmaps", "S4_taxonomy"}) + _evidence(
         r, {"S2_patents"}, lambda e: e.snippet.startswith("Filings")
     )
     return DimensionScore(
         "market_pull",
         clamp_unit(_blend(components)),
         f"pull={int(pull) if pull is not None else 'n/a'}, "
+        f"funding={f'€{funding/1e6:.1f}M' if funding is not None else 'n/a'}, "
         f"slope={slope if slope is not None else 'n/a'}, eu_aligned={aligned}",
         evidence,
     )

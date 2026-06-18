@@ -104,6 +104,20 @@ def test_scaling_is_config_driven():
     assert hi > lo
 
 
+def test_s1_funding_contributes_to_market_pull():
+    # An asset with only S1 funding signal -> market_pull is grounded by it.
+    inputs = ScoringInputs(
+        asset=asset(),
+        stream_results=[sr("S1_funding",
+                           sub("funding_momentum", 10_000_000.0,
+                               [ev("S1_funding", "€10.0M total funding across 5 rounds")]))],
+    )
+    mp = score_ventureability(inputs, CONFIG).dimension("market_pull")
+    assert mp.value == 1.0  # at the funding reference -> full credit
+    assert any("S1_funding" in e for e in mp.evidence)
+    assert "funding=€10.0M" in mp.rationale
+
+
 def test_named_regulation_lifts_regulatory_pathway():
     inputs = ScoringInputs(
         asset=asset(),

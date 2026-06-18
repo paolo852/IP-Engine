@@ -30,8 +30,14 @@ def get_database_url(url: str | None = None) -> str:
 
 
 def create_db_engine(url: str | None = None, *, echo: bool = False) -> Engine:
-    """Create a SQLAlchemy Engine for the resolved database URL."""
-    return create_engine(get_database_url(url), echo=echo, future=True)
+    """Create a SQLAlchemy Engine for the resolved database URL.
+
+    The client speaks UTF-8 explicitly so non-ASCII content (e.g. ``€`` in
+    funding evidence) round-trips regardless of the server's default encoding.
+    """
+    return create_engine(
+        get_database_url(url), echo=echo, future=True, client_encoding="utf8"
+    )
 
 
 def make_session_factory(engine: Engine) -> sessionmaker:

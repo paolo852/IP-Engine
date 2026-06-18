@@ -121,6 +121,18 @@ def _market_pull(results, cfg: dict) -> Indicator:
     return Indicator("market_pull", "none", "no roadmap/standard matches")
 
 
+def _capital_flow(results, cfg: dict) -> Indicator:
+    funding = _signal_value(results, "funding_momentum")
+    if funding is None:
+        return Indicator("capital_flow", "unknown", "no funding data")
+    money_m = funding / 1e6
+    if funding >= cfg["strong_min"]:
+        return Indicator("capital_flow", "strong", f"€{money_m:.1f}M funding in the space", True)
+    if funding >= cfg["weak_min"]:
+        return Indicator("capital_flow", "weak", f"€{money_m:.1f}M funding in the space", True)
+    return Indicator("capital_flow", "none", f"€{money_m:.1f}M funding (negligible)")
+
+
 def _eu_alignment(results) -> Indicator:
     aligned = _has_signal_prefix(results, "eu_taxonomy:")
     if aligned:
@@ -140,6 +152,7 @@ def corroborate(
         ),
         "field_crowding": _field_crowding(results, config.indicator("field_crowding")),
         "market_pull": _market_pull(results, config.indicator("market_pull")),
+        "capital_flow": _capital_flow(results, config.indicator("capital_flow")),
         "eu_alignment": _eu_alignment(results),
     }
     indicators = list(ind.values())
@@ -158,15 +171,19 @@ def corroborate(
 
 def _detect_conflicts(ind: dict[str, Indicator]) -> list[str]:
     conflicts: list[str] = []
-    # The spec's licensing/parking pattern: capital/regulatory pull into a crowded
-    # field, yet industry has not cited THIS asset.
-    if (
+    # The spec's licensing/parking pattern: capital and/or regulatory pull into a
+    # crowded field, yet industry has not cited THIS asset.
+    pull_present = (
         ind["market_pull"].level in ("weak", "strong")
+        or ind["capital_flow"].level in ("weak", "strong")
+    )
+    if (
+        pull_present
         and ind["field_crowding"].level == "crowded"
         and ind["industry_attention"].level == "none"
     ):
         conflicts.append(
-            "market/regulatory pull into a crowded field, but no forward citations "
+            "capital/regulatory pull into a crowded field, but no forward citations "
             "of this asset — interest exists yet industry has not picked up THIS asset"
         )
     return conflicts

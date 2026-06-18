@@ -14,3 +14,11 @@ s3_roadmaps:
   # How many top matches to keep, and the minimum retrieval score to count as pull.
   top_k: 5
   min_score: 0.05
+
+s1_funding:
+  # Dealroom/Crunchbase funding flows — LICENSED, built last. Only DERIVED
+  # aggregates are stored as evidence; raw licensed records are never persisted.
+  # Credentials come from the environment (FORGE_DEALROOM_API_KEY), never here.
+  funding_window_years: 3
+  max_investors: 10
+  base_url: "https://api.dealroom.co/api/v2"

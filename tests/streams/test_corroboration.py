@@ -50,6 +50,31 @@ def test_pull_into_crowded_field_without_citations_routes_to_licence_or_park():
     assert c.conflicts and "no forward citations" in c.conflicts[0]
 
 
+def test_capital_flow_is_a_favourable_indicator():
+    results = [
+        result("S2_patents",
+               sig("filing_trend_slope", 2.0), sig("forward_citation_count", 5),
+               sig("neighbour_density", 40)),
+        result("S1_funding", sig("funding_momentum", 30_000_000)),  # strong capital
+    ]
+    c = corroborate(results, CONFIG)
+    assert c.indicator("capital_flow").level == "strong"
+    assert "capital_flow" in c.agreements
+    assert c.routing is Routing.SPRINT
+
+
+def test_capital_into_crowded_field_without_citations_is_a_conflict():
+    results = [
+        result("S2_patents",
+               sig("filing_trend_slope", 1.0), sig("forward_citation_count", 0),
+               sig("neighbour_density", 150)),  # crowded, uncited
+        result("S1_funding", sig("funding_momentum", 25_000_000)),  # strong capital
+    ]
+    c = corroborate(results, CONFIG)
+    assert c.routing is Routing.LICENCE_OR_PARK
+    assert c.conflicts and "no forward citations" in c.conflicts[0]
+
+
 def test_single_positive_signal_routes_to_watch():
     results = [result("S4_taxonomy", sig("eu_taxonomy:green", 2))]
     c = corroborate(results, CONFIG)
