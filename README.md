@@ -74,6 +74,12 @@ Implemented so far:
   spec's conflict (market/regulatory pull into a crowded field with no forward
   citations → licence-or-park) is detected explicitly; every verdict is
   explainable (indicators + agreements + conflicts).
+- **Slice 7 — sector clustering (L4).** Groups scored assets into ranked
+  portfolios by theme using a config-defined sector taxonomy. Deterministic, no
+  ML: each asset is assigned to its best-matching sector by transparent
+  word-boundary term overlap (ties → earlier sector), every membership records
+  the terms that placed it, and unmatched assets go to an explicit `unclassified`
+  bucket. Members are ranked by ventureability within each sector.
 - **Slice 6 — ventureability scoring (L4).** A transparent, config-weighted
   6-dimension score (technology_maturity, market_pull, ip_defensibility,
   capital_intensity, regulatory_pathway, team_availability) — no ML. Each
@@ -117,7 +123,7 @@ Five layers + cross-cutting governance:
   cross-referencing. ← *profiling + grounding scaffolding + the S2 stream here.*
 - **L4 Scoring & clustering** — deterministic dormancy rules, 6-dimension
   ventureability score (configurable weights), sector clustering.
-  ← *dormancy rules + ventureability scoring implemented here.*
+  ← *dormancy rules + ventureability scoring + sector clustering implemented here.*
 - **L5 Output** — market-context briefs, committee dashboard, decision capture.
   ← *brief generator + decision/outcome capture + dashboard implemented here.*
 - **Governance** — grounding/audit, RBAC, GDPR/EU-hosting, prompt-injection hygiene.
@@ -212,6 +218,9 @@ python scripts/recalibration_demo.py
 
 # Run the WHOLE method end to end: ingest -> pipeline -> decision -> dashboard:
 python scripts/pipeline_demo.py
+
+# Cluster a scored pipeline into sector portfolios (deterministic, no network):
+python scripts/clustering_demo.py
 ```
 
 ### Tests
@@ -236,6 +245,7 @@ system binaries for the duration of the run. Point them at an existing database
 - `data/s3_corpus.jsonl` — curated roadmaps/standards corpus for the S3 stream.
 - `config/corroboration.yaml` — thresholds for cross-stream agreement/conflict.
 - `config/recalibration.yaml` — outcome-quality mapping + recalibration thresholds.
+- `config/sectors.yaml` — the sector taxonomy for L4 clustering.
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -258,9 +268,8 @@ system binaries for the duration of the run. Point them at an existing database
   decisions snapshot the score; a dedicated score table is not yet added).
 - Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
   rule engine exists; wiring it across the DB and recording results is later).
-- L4 capital_intensity + team_availability dimensions (indeterminate until S1
-  funding / internal team data lands); persisting scores; sector clustering
-  (build-order slice 7, not yet built).
+- L4 capital_intensity + team_availability dimensions (indeterminate until cost/
+  TRL and internal team data land); persisting scores/clusters across the store.
 - L5 dashboard UI (the read model is built; the web front-end is out of scope here);
   recalibration *applying* proposals automatically (it only proposes today);
   governance (RBAC, EU-hosting).

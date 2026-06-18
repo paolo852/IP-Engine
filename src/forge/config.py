@@ -350,3 +350,48 @@ def load_recalibration_config(path: str | os.PathLike[str]) -> RecalibrationConf
         min_sample=min_sample,
         min_separation=min_separation,
     )
+
+
+@dataclass(frozen=True)
+class Sector:
+    id: str
+    label: str
+    terms: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SectorsConfig:
+    """Validated sector taxonomy for deterministic L4 clustering."""
+
+    sectors: tuple[Sector, ...]
+    min_terms: int
+
+
+def load_sectors_config(path: str | os.PathLike[str]) -> SectorsConfig:
+    """Load + validate the sector taxonomy (unique ids, non-empty term sets)."""
+    data = _read_yaml(path)
+    raw = data.get("sectors")
+    if not isinstance(raw, list) or not raw:
+        raise ConfigError("sectors config needs a non-empty 'sectors' list")
+    sectors: list[Sector] = []
+    seen: set[str] = set()
+    for spec in raw:
+        if not isinstance(spec, dict) or not spec.get("id") or not isinstance(
+            spec.get("terms"), list
+        ) or not spec["terms"]:
+            raise ConfigError("each sector needs an 'id' and a non-empty 'terms' list")
+        sid = str(spec["id"])
+        if sid in seen:
+            raise ConfigError(f"duplicate sector id {sid!r}")
+        seen.add(sid)
+        sectors.append(
+            Sector(id=sid, label=str(spec.get("label", sid)),
+                   terms=tuple(str(t) for t in spec["terms"]))
+        )
+    try:
+        min_terms = int(data.get("min_terms", 1))
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"sectors 'min_terms' must be an integer: {exc}") from exc
+    if min_terms < 1:
+        raise ConfigError("sectors 'min_terms' must be >= 1")
+    return SectorsConfig(sectors=tuple(sectors), min_terms=min_terms)

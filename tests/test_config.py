@@ -16,6 +16,7 @@ from forge.config import (
     load_organisation_config,
     load_recalibration_config,
     load_scoring_config,
+    load_sectors_config,
     load_streams_config,
     load_taxonomy_config,
 )
@@ -29,6 +30,7 @@ REPO_STREAMS = "config/streams.yaml"
 REPO_TAXONOMY = "config/taxonomy.yaml"
 REPO_CORROBORATION = "config/corroboration.yaml"
 REPO_RECALIBRATION = "config/recalibration.yaml"
+REPO_SECTORS = "config/sectors.yaml"
 
 
 def test_repo_scoring_config_is_valid():
@@ -328,3 +330,28 @@ def test_recalibration_requires_outcome_lists(tmp_path):
     p.write_text("outcome_quality:\n  spun_out: 1.0\ngood_outcomes: [spun_out]\n")
     with pytest.raises(ConfigError, match="bad_outcomes"):
         load_recalibration_config(p)
+
+
+def test_repo_sectors_config_is_valid():
+    cfg = load_sectors_config(REPO_SECTORS)
+    ids = [s.id for s in cfg.sectors]
+    assert "photonics" in ids and len(ids) == len(set(ids))
+    assert cfg.min_terms >= 1
+
+
+def test_sectors_rejects_duplicate_ids(tmp_path):
+    p = tmp_path / "sectors.yaml"
+    p.write_text(
+        "sectors:\n"
+        "  - {id: x, terms: [a]}\n"
+        "  - {id: x, terms: [b]}\n"
+    )
+    with pytest.raises(ConfigError, match="duplicate sector id"):
+        load_sectors_config(p)
+
+
+def test_sectors_rejects_empty_terms(tmp_path):
+    p = tmp_path / "sectors.yaml"
+    p.write_text("sectors:\n  - {id: x, label: X}\n")
+    with pytest.raises(ConfigError, match="non-empty 'terms'"):
+        load_sectors_config(p)

@@ -1,0 +1,26 @@
+# Sector taxonomy for L4 clustering — CONFIG, not code. Deterministic, no ML.
+# Each scored asset is assigned to its best-matching sector by term overlap, so
+# the committee sees ranked portfolios by theme. Tune the themes here freely.
+
+min_terms: 1   # minimum matched terms to place an asset in a sector
+
+sectors:
+  - id: photonics
+    label: "Integrated photonics & optical computing"
+    terms: [photonic, photonics, optical, waveguide, interconnect, modulator, silicon photonics]
+
+  - id: ai_semiconductors
+    label: "AI hardware & semiconductors"
+    terms: [semiconductor, microelectronics, accelerator, edge ai, inference, neural, chip]
+
+  - id: green_energy
+    label: "Green energy & decarbonisation"
+    terms: [hydrogen, electrolyser, fuel cell, solar, photovoltaic, wind turbine, battery]
+
+  - id: advanced_materials
+    label: "Advanced materials"
+    terms: [advanced materials, nanomaterial, composite, coating, catalyst, alloy]
+
+  - id: biotech
+    label: "Biotechnology & life sciences"
+    terms: [biotechnology, biomarker, assay, genomic, therapeutic, diagnostic]
