@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}{{ asset.title or "asset" }} — FORGE{% endblock %}
+{% block content %}
+<p class="back"><a href="/">&larr; dashboard</a></p>
+<h2 style="font-size:19px;margin:0 0 2px">{{ asset.title or "(untitled)" }}</h2>
+<p class="muted" style="margin:0 0 18px">
+  {{ asset.asset_type.value }} · {{ asset.source_layer }} · legal status:
+  {{ asset.legal_status or "unknown" }}
+</p>
+
+<!-- ventureability ------------------------------------------------------->
+<div class="card">
+  <h2>Ventureability</h2>
+  {% if score %}
+    <p>
+      <span class="score" style="font-size:22px">
+        {% if score.ventureability is not none %}{{ "%.2f"|format(score.ventureability) }}{% else %}indeterminate{% endif %}
+      </span>
+      <span class="muted">coverage {{ "%.0f"|format(score.coverage * 100) }}%</span>
+      {% if score.routing %}<span class="pill {{ score.routing }}">{{ score.routing }}</span>{% endif %}
+    </p>
+    {% for d in score.dimensions %}
+    <div class="dim">
+      <span class="name">{{ d.dimension }}</span>
+      {% if d.value is not none %}
+        <span class="bar"><span style="width:{{ (d.value * 100)|round(0,'floor') }}%"></span></span>
+        <span class="val">{{ "%.2f"|format(d.value) }}</span>
+      {% else %}
+        <span class="bar"></span><span class="val muted">n/a</span>
+      {% endif %}
+      <span class="why">{{ d.rationale }}</span>
+    </div>
+    {% endfor %}
+    <p class="src">Transparent weighted score (rule 2): every dimension shows its value and rationale; indeterminate dimensions are reported, never fabricated.</p>
+  {% else %}
+    <p class="muted">Not yet scored — run <code>forge pipeline</code> for this asset.</p>
+  {% endif %}
+</div>
+
+<!-- dormancy ------------------------------------------------------------->
+{% if dormancy %}
+<div class="card">
+  <h2>Dormancy — {{ dormancy.verdict() }}</h2>
+  <p class="muted">as of {{ dormancy.as_of.isoformat() }}</p>
+  {% for c in dormancy.conditions %}
+    <div class="dim">
+      <span class="name">{{ c.name }}</span>
+      <span class="pill {{ 'sprint' if c.status.value == 'pass' else ('reject' if c.status.value == 'fail' else 'watch') }}">{{ c.status.value }}</span>
+      <span class="why">{{ c.detail }}</span>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- profile -------------------------------------------------------------->
+{% if profile %}
+<div class="card">
+  <h2>Problem &amp; solution <span class="muted" style="font-weight:400;font-size:12px">(grounded, model: {{ profile.model }})</span></h2>
+  {% set quotes = {} %}
+  {% for g in profile.grounding %}{% if quotes.update({g.field_name: g}) %}{% endif %}{% endfor %}
+  <p><strong>Problem.</strong> {{ profile.problem }}</p>
+  {% if quotes.get('problem') %}<div class="quote">“{{ quotes['problem'].supporting_quote }}”<div class="src">— asset.{{ quotes['problem'].source_field }}</div></div>{% endif %}
+  <p><strong>Solution.</strong> {{ profile.solution }}</p>
+  {% if quotes.get('solution') %}<div class="quote">“{{ quotes['solution'].supporting_quote }}”<div class="src">— asset.{{ quotes['solution'].source_field }}</div></div>{% endif %}
+  {% for app in profile.applications %}
+    <p><strong>Application.</strong> {{ app }}</p>
+    {% if quotes.get('application[' ~ loop.index0 ~ ']') %}<div class="quote">“{{ quotes['application[' ~ loop.index0 ~ ']'].supporting_quote }}”<div class="src">— asset.{{ quotes['application[' ~ loop.index0 ~ ']'].source_field }}</div></div>{% endif %}
+  {% endfor %}
+  <p class="src">Query terms: {{ profile.query_terms | join(", ") }}</p>
+</div>
+{% endif %}
+
+<!-- evidence ------------------------------------------------------------->
+<div class="card">
+  <h2>Cross-stream evidence <span class="muted" style="font-weight:400;font-size:12px">({{ evidence|length }} signal{{ '' if evidence|length == 1 else 's' }})</span></h2>
+  {% if not evidence %}
+    <p class="muted">No cross-stream signals stored (S2/S1 need live credentials in this demo).</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Stream</th><th>Strength</th><th>Snippet</th><th>Source (provenance)</th></tr></thead>
+    <tbody>
+      {% for e in evidence %}
+      <tr>
+        <td>{{ e.stream or "—" }}</td>
+        <td class="score">{% if e.match_strength is not none %}{{ "%.2f"|format(e.match_strength) }}{% else %}—{% endif %}</td>
+        <td>{{ e.snippet or "" }}</td>
+        <td class="src">{{ e.source.source_type }}:{{ e.source.locator }}<br><span class="pill">{{ e.source.licence.value }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<!-- provenance ----------------------------------------------------------->
+<div class="card">
+  <h2>Field provenance <span class="muted" style="font-weight:400;font-size:12px">(no source → no claim, rule 1)</span></h2>
+  <table>
+    <thead><tr><th>Field</th><th>Source</th><th>Licence</th></tr></thead>
+    <tbody>
+      {% for p in provenance %}
+      <tr><td>{{ p.field_name }}</td><td class="src">{{ p.source.source_type }}:{{ p.source.locator }}</td><td><span class="pill">{{ p.source.licence.value }}</span></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- decision / outcome --------------------------------------------------->
+<div class="card">
+  <h2>Committee decision</h2>
+  {% if decision %}
+    <p>Latest: <span class="pill {{ decision.decision.value }}">{{ decision.decision.value }}</span>
+       by {{ decision.decided_by }} on {{ decision.decided_at.date().isoformat() }}
+       {% if decision.rationale %}<br><span class="muted">{{ decision.rationale }}</span>{% endif %}</p>
+  {% else %}
+    <p class="muted">No decision recorded yet.</p>
+  {% endif %}
+
+  {% if can_decide %}
+  <form class="inline" method="post" action="/asset/{{ asset.id }}/decide">
+    <select name="decision">
+      {% for d in decision_types %}<option value="{{ d.name }}">{{ d.value }}</option>{% endfor %}
+    </select>
+    <input name="decided_by" placeholder="decided by" value="{{ principal.name }}">
+    <input name="rationale" placeholder="rationale (optional)" style="flex:1;min-width:180px">
+    <button type="submit">Record decision</button>
+  </form>
+  {% else %}
+    <p class="banner">Acting role <strong>{{ principal.role }}</strong> may not record decisions.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Realised outcome</h2>
+  {% if outcome %}
+    <p>Latest: <strong>{{ outcome.outcome.value }}</strong> by {{ outcome.recorded_by }}
+       on {{ outcome.recorded_at.date().isoformat() }}
+       {% if outcome.notes %}<br><span class="muted">{{ outcome.notes }}</span>{% endif %}</p>
+  {% else %}
+    <p class="muted">No outcome recorded yet.</p>
+  {% endif %}
+
+  {% if can_record_outcome %}
+  <form class="inline" method="post" action="/asset/{{ asset.id }}/outcome">
+    <select name="outcome">
+      {% for o in outcome_types %}<option value="{{ o.name }}">{{ o.value }}</option>{% endfor %}
+    </select>
+    <input name="recorded_by" placeholder="recorded by" value="{{ principal.name }}">
+    <input name="notes" placeholder="notes (optional)" style="flex:1;min-width:180px">
+    <button type="submit" class="secondary">Record outcome</button>
+  </form>
+  {% else %}
+    <p class="banner">Acting role <strong>{{ principal.role }}</strong> may not record outcomes.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -32,6 +32,7 @@ Installing the package registers a `forge` command (DB URL from
 
 ```bash
 forge db upgrade                      # run migrations to head
+forge seed                            # load synthetic demo assets + score offline
 forge ingest-epo EP1000000            # ingest patents via EPO OPS (needs key)
 forge assets                          # list ingested assets
 forge dormancy --all                  # assess dormancy
@@ -41,7 +42,47 @@ forge dashboard                       # the ranked committee pipeline
 forge decide <asset-id> sprint --by committee@org
 forge outcome <asset-id> licensed --by ops@org
 forge recalibrate --since-days 90     # quarterly calibration check
+forge serve                           # run the demo web UI (needs the 'web' extra)
 ```
+
+## Demo web UI
+
+A server-rendered FastAPI app presents the engine's output: the ranked committee
+dashboard, and per-asset detail with the transparent ventureability breakdown,
+dormancy verdict, grounded problem/solution (with verbatim quotes), cross-stream
+evidence (each with its provenance), and forms for the committee to record
+decisions/outcomes. It only *presents* what the engine persisted — no scoring or
+grounding logic lives in the web layer, so the UI can never diverge from the
+method. Writes are RBAC-gated by the same governance policy as the CLI (role from
+`FORGE_ROLE`).
+
+```bash
+pip install -e '.[web]'
+export FORGE_DATABASE_URL=postgresql+psycopg2://...   # e.g. a Supabase Postgres
+forge db upgrade && forge seed                        # migrate + synthetic demo
+forge serve                                           # http://127.0.0.1:8000
+```
+
+`forge seed` populates synthetic public patents and runs the pipeline with an
+**offline** profiling provider (no LLM key, no network), so the demo is fully
+reproducible. S2/S1 (patents/funding) need live credentials and are simply
+absent — the score reports its reduced coverage rather than inventing.
+
+### Running FORGE on a Supabase Postgres
+
+FORGE manages its own schema with Alembic — it does **not** use Supabase Auth/RLS.
+To host the engine's database on Supabase, point `FORGE_DATABASE_URL` at the
+project's Postgres connection string (UTF-8; SSL required) and migrate:
+
+```bash
+export FORGE_DATABASE_URL="postgresql+psycopg2://postgres:<pwd>@db.<ref>.supabase.co:5432/postgres?sslmode=require"
+forge db upgrade        # creates all FORGE tables
+forge seed              # optional: synthetic demo data
+forge serve             # the UI reads/writes that database
+```
+
+Vercel hosts static/serverless frontends, not this Python app; run `forge serve`
+on any Python host (or container) and point it at the Supabase database.
 
 ## End-to-end orchestration
 
@@ -298,9 +339,10 @@ system binaries for the duration of the run. Point them at an existing database
   the brief inputs.
 - OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
   names need a biblio follow-up per citing doc — currently fake-only).
-- A scheduler/CLI around the orchestration (the `Pipeline` runs a batch in-process
-  and is idempotent; a cron/queue front-end and a real-LLM/real-API smoke path —
-  which need credentials — are not built).
+- A scheduler around the orchestration (the `Pipeline` runs a batch in-process via
+  `forge pipeline` and is idempotent; a cron/queue front-end is not built). A
+  credential-free offline smoke path exists (`forge seed`); a real-LLM/real-API
+  smoke run still needs credentials.
 - Persisting briefs (the pipeline returns the brief in memory; the score is now
   persisted to `asset_score` — one row per asset, replaced on re-score — and the
   dashboard/clustering rank on it, preferring it over the decision snapshot).
@@ -308,8 +350,9 @@ system binaries for the duration of the run. Point them at an existing database
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 capital_intensity + team_availability dimensions (indeterminate until cost/
   TRL and internal team data land).
-- L5 dashboard UI (the read model is built; the web front-end is out of scope here);
-  recalibration *applying* proposals automatically (it only proposes today).
+- Recalibration *applying* proposals automatically (it only proposes today —
+  humans retune). The L5 demo web UI (`forge serve`) now renders the dashboard
+  and per-asset evidence/score and captures decisions/outcomes.
 - Authentication / identity is out of scope: RBAC enforces a role supplied via
   `FORGE_ROLE`; binding roles to authenticated users belongs to the deployment.
 

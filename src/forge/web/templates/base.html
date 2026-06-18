@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FORGE Mining Engine{% endblock %}</title>
+  <style>
+    :root { --ink:#1a1f26; --muted:#6b7280; --line:#e5e7eb; --bg:#f7f8fa;
+            --sprint:#0a7c3a; --license:#0b5fff; --park:#9a6700; --watch:#6b7280;
+            --hold:#9a6700; --reject:#b42318; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+           color:#1a1f26; background:var(--bg); }
+    header { background:#0f172a; color:#fff; padding:14px 24px; display:flex;
+             align-items:center; gap:16px; }
+    header h1 { font-size:16px; margin:0; font-weight:600; letter-spacing:.2px; }
+    header a { color:#cbd5e1; text-decoration:none; }
+    header .spacer { flex:1; }
+    .role { font-size:12px; background:#1e293b; padding:4px 10px; border-radius:999px; }
+    main { max-width:1000px; margin:24px auto; padding:0 20px; }
+    table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line);
+            border-radius:10px; overflow:hidden; }
+    th,td { text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); }
+    th { background:#f1f3f5; font-size:12px; text-transform:uppercase; letter-spacing:.4px;
+         color:var(--muted); }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:#fafbfc; }
+    a.asset { color:#0b5fff; text-decoration:none; font-weight:500; }
+    .score { font-variant-numeric:tabular-nums; font-weight:600; }
+    .pill { display:inline-block; font-size:12px; padding:2px 9px; border-radius:999px;
+            background:#eef1f4; color:#374151; }
+    .pill.sprint{background:#e6f4ec;color:var(--sprint)} .pill.license{background:#e7efff;color:var(--license)}
+    .pill.park{background:#fbf1dd;color:var(--park)} .pill.watch{background:#eef1f4;color:var(--watch)}
+    .pill.hold{background:#fbf1dd;color:var(--hold)} .pill.reject{background:#fdecea;color:var(--reject)}
+    .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px 20px;
+            margin-bottom:18px; }
+    .card h2 { margin:0 0 12px; font-size:15px; }
+    .muted { color:var(--muted); }
+    .quote { border-left:3px solid #cbd5e1; padding:2px 0 2px 12px; margin:4px 0; color:#374151;
+             font-style:italic; }
+    .src { font-size:12px; color:var(--muted); }
+    .dim { display:flex; align-items:center; gap:10px; margin:6px 0; }
+    .bar { flex:0 0 120px; height:7px; background:#eef1f4; border-radius:4px; overflow:hidden; }
+    .bar > span { display:block; height:100%; background:#0b5fff; }
+    .dim .name { flex:0 0 170px; font-size:13px; }
+    .dim .val { flex:0 0 44px; font-variant-numeric:tabular-nums; font-weight:600; font-size:13px; }
+    .dim .why { color:var(--muted); font-size:13px; }
+    form.inline { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
+    select,input,button { font:inherit; padding:7px 10px; border:1px solid var(--line);
+                          border-radius:7px; background:#fff; }
+    button { background:#0f172a; color:#fff; border-color:#0f172a; cursor:pointer; }
+    button.secondary { background:#fff; color:#0f172a; }
+    .back { font-size:13px; }
+    .empty { color:var(--muted); padding:30px; text-align:center; }
+    .banner { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:8px 12px;
+              border-radius:8px; font-size:13px; margin-bottom:14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="/">FORGE Mining Engine</a></h1>
+    <span class="muted" style="font-size:12px">ranks &amp; evidences dormant assets</span>
+    <span class="spacer"></span>
+    <span class="role">mode: {{ mode }}</span>
+    <span class="role">acting: {{ principal.name }} ({{ principal.role }})</span>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

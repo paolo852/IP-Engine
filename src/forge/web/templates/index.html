@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}FORGE — committee dashboard{% endblock %}
+{% block content %}
+<h2 style="font-size:18px;margin:0 0 4px">Committee dashboard</h2>
+<p class="muted" style="margin:0 0 18px">
+  Assets ranked by ventureability. The engine ranks and evidences; humans decide.
+</p>
+
+{% if not rows %}
+  <div class="card empty">
+    No assets yet. Seed the synthetic demo with <code>forge seed</code>, then
+    refresh.
+  </div>
+{% else %}
+<table>
+  <thead>
+    <tr><th>Score</th><th>Routing</th><th>Asset</th><th>Decision</th><th>Outcome</th></tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="score">{% if r.engine_score is not none %}{{ "%.2f"|format(r.engine_score) }}{% else %}—{% endif %}</td>
+      <td>{% if r.engine_routing %}<span class="pill {{ r.engine_routing }}">{{ r.engine_routing }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td><a class="asset" href="/asset/{{ r.asset_id }}">{{ r.title or "(untitled)" }}</a></td>
+      <td>{% if r.decision %}<span class="pill {{ r.decision }}">{{ r.decision }}</span>{% else %}<span class="muted">pending</span>{% endif %}</td>
+      <td>{{ r.outcome or "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -44,6 +44,8 @@ COMMAND_PERMISSIONS = {
     "decide": "decide",
     "outcome": "record_outcome",
     "recalibrate": "recalibrate",
+    "seed": "ingest",
+    "serve": "view",
 }
 
 
@@ -239,6 +241,27 @@ def cmd_outcome(args, session: Session) -> int:
     return 0
 
 
+def cmd_seed(args, session: Session) -> int:
+    from .seed import seed_demo
+
+    report = seed_demo(session, policy=args.gov)
+    print(report.summary())
+    for err in report.errors:
+        print(f"  ! {err}")
+    return 0 if not report.errors else 1
+
+
+def cmd_serve(args, session) -> int:
+    import uvicorn
+
+    from .web import create_app
+
+    app = create_app()
+    print(f"FORGE demo UI on http://{args.host}:{args.port}  (Ctrl-C to stop)")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    return 0
+
+
 def cmd_recalibrate(args, session: Session) -> int:
     from .config import load_recalibration_config, load_scoring_config
     from .recalibration import run_recalibration
@@ -286,6 +309,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("cluster", help="cluster profiled assets by sector").set_defaults(func=cmd_cluster)
     sub.add_parser("dashboard", help="print the ranked committee dashboard").set_defaults(func=cmd_dashboard)
+    sub.add_parser("seed", help="load synthetic demo assets and score them offline").set_defaults(func=cmd_seed)
+
+    p = sub.add_parser("serve", help="run the demo web UI")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8000)
+    p.set_defaults(func=cmd_serve, needs_db=False)
 
     p = sub.add_parser("decide", help="record a committee decision")
     p.add_argument("asset_id")
@@ -332,6 +361,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: governance config: {exc}", file=sys.stderr)
         return 1
     args.gov = gov
+
+    # Commands that own their own DB lifecycle (or need none) skip the shared
+    # session — e.g. `serve` launches a server with a per-request session factory.
+    if not getattr(args, "needs_db", True):
+        return args.func(args, None)
 
     try:
         session = make_session_factory(create_db_engine(get_database_url()))()
