@@ -153,7 +153,7 @@ def cmd_pipeline(args, session: Session) -> int:
 def cmd_cluster(args, session: Session) -> int:
     from .clustering import ClusterInput, cluster_assets
     from .config import load_sectors_config
-    from .repository import get_profile, latest_decision
+    from .repository import get_profile, get_score, latest_decision
 
     inputs: list[ClusterInput] = []
     for asset in session.execute(select(Asset)).scalars():
@@ -165,11 +165,17 @@ def cmd_cluster(args, session: Session) -> int:
             + list(profile.applications or [])
             + list(profile.query_terms or [])
         )
-        decision = latest_decision(session, asset.id)
+        # Prefer the live persisted engine score; fall back to the decision snapshot.
+        score = get_score(session, asset.id)
+        if score is not None:
+            ventureability = score.ventureability
+        else:
+            decision = latest_decision(session, asset.id)
+            ventureability = decision.engine_score if decision else None
         inputs.append(
             ClusterInput(
                 asset_id=asset.id, title=asset.title, text=text,
-                ventureability=decision.engine_score if decision else None,
+                ventureability=ventureability,
             )
         )
 

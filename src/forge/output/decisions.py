@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from ..db.models import (
     Asset,
     AssetOutcome,
+    AssetScore,
     CommitteeDecision,
     DecisionType,
     OutcomeType,
@@ -91,8 +92,10 @@ class DashboardRow:
 def dashboard(session: Session) -> list[DashboardRow]:
     """Ranked pipeline: every asset with its latest decision/outcome + score.
 
-    Sorted by ventureability descending; assets without a score (not yet scored
-    at decision time, or not yet reviewed) sort last, then by title.
+    The displayed score prefers the latest persisted engine score (AssetScore,
+    written by the pipeline) and falls back to the decision-time snapshot when an
+    asset has been reviewed but not (re-)scored. Sorted by ventureability
+    descending; assets without any score sort last, then by title.
     """
     assets = list(session.execute(select(Asset)).scalars())
 
@@ -112,17 +115,24 @@ def dashboard(session: Session) -> list[DashboardRow]:
     ).scalars():
         latest_out.setdefault(o.asset_id, o)
 
+    scores: dict = {
+        s.asset_id: s for s in session.execute(select(AssetScore)).scalars()
+    }
+
     rows: list[DashboardRow] = []
     for asset in assets:
         dec = latest_dec.get(asset.id)
         out = latest_out.get(asset.id)
+        sc = scores.get(asset.id)
+        engine_score = sc.ventureability if sc else (dec.engine_score if dec else None)
+        engine_routing = sc.routing if sc else (dec.engine_routing if dec else None)
         rows.append(
             DashboardRow(
                 asset_id=asset.id,
                 title=asset.title,
                 asset_type=asset.asset_type.value,
-                engine_score=dec.engine_score if dec else None,
-                engine_routing=dec.engine_routing if dec else None,
+                engine_score=engine_score,
+                engine_routing=engine_routing,
                 decision=dec.decision.value if dec else None,
                 decided_by=dec.decided_by if dec else None,
                 outcome=out.outcome.value if out else None,

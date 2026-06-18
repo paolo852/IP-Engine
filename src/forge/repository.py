@@ -19,6 +19,7 @@ from .db.models import (
     Asset,
     AssetOutcome,
     AssetProfile,
+    AssetScore,
     CommitteeDecision,
     DecisionType,
     Evidence,
@@ -322,3 +323,49 @@ def latest_outcome(session: Session, asset_id: uuid.UUID) -> AssetOutcome | None
         .limit(1)
     )
     return session.execute(stmt).scalar_one_or_none()
+
+
+# -- engine score (latest persisted ventureability) -------------------------
+def save_score(
+    session: Session,
+    asset: Asset,
+    score,
+    *,
+    routing: str | None = None,
+) -> AssetScore:
+    """Persist (or replace) the latest engine score for an asset.
+
+    Delete-then-insert keeps exactly one row per asset (idempotent re-scoring).
+    The per-dimension breakdown is stored verbatim so the dashboard and
+    clustering can rank on live engine output and stay fully explainable
+    (rule 2) without re-running the pipeline.
+    """
+    delete_score(session, asset.id)
+    row = AssetScore(
+        asset_id=asset.id,
+        ventureability=score.value,
+        coverage=score.coverage,
+        routing=routing,
+        dimensions=[
+            {
+                "dimension": d.dimension,
+                "value": d.value,
+                # Strip NUL (\x00): Postgres JSONB/text cannot store it, and it can
+                # surface in rationales built from raw patent/market text.
+                "rationale": (d.rationale or "").replace("\x00", ""),
+            }
+            for d in score.dimensions
+        ],
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def get_score(session: Session, asset_id: uuid.UUID) -> AssetScore | None:
+    stmt = select(AssetScore).where(AssetScore.asset_id == asset_id)
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def delete_score(session: Session, asset_id: uuid.UUID) -> None:
+    session.execute(delete(AssetScore).where(AssetScore.asset_id == asset_id))

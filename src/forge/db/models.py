@@ -403,6 +403,34 @@ class AssetOutcome(Base):
     decision: Mapped[CommitteeDecision | None] = relationship()
 
 
+class AssetScore(Base):
+    """The latest persisted ventureability score for an asset (engine output).
+
+    One row per asset (replaced on re-score). Stores the overall value, coverage,
+    the corroboration routing, and the per-dimension breakdown so the dashboard
+    and clustering can rank on live engine scores without re-running the pipeline.
+    A derived signal — explainable, not a human decision.
+    """
+
+    __tablename__ = "asset_score"
+    __table_args__ = (UniqueConstraint("asset_id", name="uq_asset_score_asset"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset.id", ondelete="CASCADE"), nullable=False
+    )
+    ventureability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    coverage: Mapped[float] = mapped_column(Float, nullable=False)
+    routing: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # [{dimension, value, rationale}] — the explainable breakdown.
+    dimensions: Mapped[list] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    asset: Mapped[Asset] = relationship()
+
+
 class RecalibrationLog(Base):
     """An audit record of one quarterly recalibration run.
 

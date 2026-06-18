@@ -6,11 +6,22 @@ hard-coded, never carrying secrets in source.
 
 from __future__ import annotations
 
+import json
 import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+
+def _json_serializer(obj) -> str:
+    """Serialize JSON/JSONB values as literal UTF-8, not ``\\uXXXX`` escapes.
+
+    With ``ensure_ascii`` left on (the default), ``€`` becomes ``\\u20ac`` — which
+    a non-UTF-8 server (e.g. a SQL_ASCII cluster) cannot translate into JSONB.
+    Emitting the character directly lets ``client_encoding=utf8`` carry it.
+    """
+    return json.dumps(obj, ensure_ascii=False)
 
 DEFAULT_DATABASE_URL_ENV = "FORGE_DATABASE_URL"
 
@@ -36,7 +47,11 @@ def create_db_engine(url: str | None = None, *, echo: bool = False) -> Engine:
     funding evidence) round-trips regardless of the server's default encoding.
     """
     return create_engine(
-        get_database_url(url), echo=echo, future=True, client_encoding="utf8"
+        get_database_url(url),
+        echo=echo,
+        future=True,
+        client_encoding="utf8",
+        json_serializer=_json_serializer,
     )
 
 

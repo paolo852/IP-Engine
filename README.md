@@ -193,6 +193,7 @@ Five layers + cross-cutting governance:
 | `evidence` | Normalised, derived cross-stream signal (S1–S4), kept separate from raw. |
 | `asset_profile` | LLM-derived `{problem, solution, applications}` profile (internal-licence source). |
 | `profile_grounding` | The verbatim quote + asset field grounding each profile statement. |
+| `asset_score` | The latest persisted ventureability score (value, coverage, routing, per-dimension breakdown) — one row per asset, replaced on re-score. |
 | `committee_decision` | The committee's decision + the Engine's routing/score snapshot at decision time. |
 | `asset_outcome` | The realised outcome (licensed / spun-out / parked …), feeding recalibration. |
 | `recalibration_log` | Audit record of each quarterly recalibration run (stats, verdict, weights snapshot). |
@@ -300,12 +301,13 @@ system binaries for the duration of the run. Point them at an existing database
 - A scheduler/CLI around the orchestration (the `Pipeline` runs a batch in-process
   and is idempotent; a cron/queue front-end and a real-LLM/real-API smoke path —
   which need credentials — are not built).
-- Persisting ventureability scores/briefs (the pipeline returns them in memory and
-  decisions snapshot the score; a dedicated score table is not yet added).
+- Persisting briefs (the pipeline returns the brief in memory; the score is now
+  persisted to `asset_score` — one row per asset, replaced on re-score — and the
+  dashboard/clustering rank on it, preferring it over the decision snapshot).
 - Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 capital_intensity + team_availability dimensions (indeterminate until cost/
-  TRL and internal team data land); persisting scores/clusters across the store.
+  TRL and internal team data land).
 - L5 dashboard UI (the read model is built; the web front-end is out of scope here);
   recalibration *applying* proposals automatically (it only proposes today).
 - Authentication / identity is out of scope: RBAC enforces a role supplied via

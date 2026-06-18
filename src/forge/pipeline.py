@@ -48,6 +48,7 @@ from .repository import (
     get_asset,
     get_profile,
     save_profile,
+    save_score,
     save_stream_result,
 )
 from .scoring import ScoringInputs, VentureabilityScore, score_ventureability
@@ -188,6 +189,16 @@ class Pipeline:
             )
         except Exception as exc:  # noqa: BLE001
             result.errors.append(f"synthesis: {exc}")
+
+        # Persist the engine score so the dashboard and clustering can rank on
+        # live output without re-running the pipeline (idempotent: one row/asset).
+        if result.score is not None:
+            try:
+                routing = result.corroboration.routing.value if result.corroboration else None
+                save_score(session, asset, result.score, routing=routing)
+            except Exception as exc:  # noqa: BLE001
+                session.rollback()
+                result.errors.append(f"persist-score: {exc}")
 
         return result
 
