@@ -395,3 +395,44 @@ def load_sectors_config(path: str | os.PathLike[str]) -> SectorsConfig:
     if min_terms < 1:
         raise ConfigError("sectors 'min_terms' must be >= 1")
     return SectorsConfig(sectors=tuple(sectors), min_terms=min_terms)
+
+
+@dataclass(frozen=True)
+class GovernanceConfig:
+    """Validated governance policy: RBAC, data residency, data protection."""
+
+    mode: str
+    restricted_asset_types: tuple[str, ...]
+    dev_allowed_licences: tuple[str, ...]
+    require_eu_hosting: bool
+    eu_host_markers: tuple[str, ...]
+    roles: dict  # role name -> tuple[str, ...] of permission names
+
+
+def load_governance_config(path: str | os.PathLike[str]) -> GovernanceConfig:
+    """Load + structurally validate the governance policy."""
+    data = _read_yaml(path)
+    mode = str(data.get("mode", "development"))
+    if mode not in ("development", "production_eu"):
+        raise ConfigError("governance 'mode' must be 'development' or 'production_eu'")
+
+    dp = data.get("data_protection") or {}
+    res = data.get("residency") or {}
+    rbac = data.get("rbac") or {}
+    roles_raw = rbac.get("roles")
+    if not isinstance(roles_raw, dict) or not roles_raw:
+        raise ConfigError("governance config needs a non-empty 'rbac.roles' mapping")
+    roles: dict = {}
+    for name, perms in roles_raw.items():
+        if not isinstance(perms, list):
+            raise ConfigError(f"role {name!r} permissions must be a list")
+        roles[str(name)] = tuple(str(p) for p in perms)
+
+    return GovernanceConfig(
+        mode=mode,
+        restricted_asset_types=tuple(str(t) for t in dp.get("restricted_asset_types", [])),
+        dev_allowed_licences=tuple(str(t) for t in dp.get("dev_allowed_licences", [])),
+        require_eu_hosting=bool(res.get("require_eu_hosting", False)),
+        eu_host_markers=tuple(str(m) for m in res.get("eu_host_markers", [])),
+        roles=roles,
+    )

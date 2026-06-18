@@ -1,0 +1,29 @@
+# Governance policy — RBAC, data residency, and data protection (GDPR / rule 4).
+# Cross-cutting: enforced at the engine's seams (CLI authorization, ingest,
+# hosted-LLM calls). CONFIG, not code.
+
+# Environment mode. 'development' permits SYNTHETIC/PUBLIC data only (rule 4);
+# personal/confidential portfolios (e.g. invention disclosures) require
+# 'production_eu' under GDPR / EU-hosting protocols.
+mode: development
+
+data_protection:
+  # Asset types that may carry personal/confidential data — blocked in development.
+  restricted_asset_types: [disclosure]
+  # Source licence classes permitted for stored ASSETS in development.
+  dev_allowed_licences: [free, public, synthetic]
+
+residency:
+  # EU-hosting is preferred for hosted-LLM calls. In production_eu set this true
+  # to ENFORCE (block non-EU endpoints); in development it is advisory (warns).
+  require_eu_hosting: false
+  # Substrings that mark an LLM base_url as EU-hosted.
+  eu_host_markers: ["eu.", ".eu/", "europe", "eu-"]
+
+rbac:
+  # role -> permissions. 'admin' implies every permission.
+  roles:
+    viewer:    [view]
+    analyst:   [view, ingest, run_pipeline]
+    committee: [view, decide, record_outcome]
+    admin:     [admin]

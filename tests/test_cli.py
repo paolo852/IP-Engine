@@ -93,3 +93,18 @@ def test_recalibrate_command(session, capsys):
 def test_no_command_prints_help(capsys):
     assert main([]) == 2
     assert "FORGE Mining Engine CLI" in capsys.readouterr().out
+
+
+def test_rbac_blocks_unauthorised_command(session, capsys, monkeypatch):
+    import uuid
+
+    monkeypatch.setenv("FORGE_ROLE", "viewer")  # viewer may not decide
+    assert main(["decide", str(uuid.uuid4()), "sprint"]) == 1
+    assert "not permitted to 'decide'" in capsys.readouterr().err
+
+
+def test_rbac_allows_permitted_command(session, capsys, monkeypatch):
+    save_asset(session, synthetic_patent_bundle())
+    monkeypatch.setenv("FORGE_ROLE", "viewer")  # viewer may view
+    assert main(["assets"]) == 0
+    assert "photonic" in capsys.readouterr().out.lower()

@@ -61,11 +61,14 @@ def ungrounded_fields(asset: Asset, grounded_field_names: set[str]) -> list[str]
     ]
 
 
-def save_asset(session: Session, bundle: AssetBundle) -> Asset:
+def save_asset(session: Session, bundle: AssetBundle, *, policy=None) -> Asset:
     """Persist an asset + its provenance, enforcing the grounding rule.
 
     Every populated factual field MUST be covered by at least one ProvenanceEntry,
-    otherwise ``GroundingError`` is raised and nothing is committed.
+    otherwise ``GroundingError`` is raised and nothing is committed. If a
+    governance ``policy`` (GovernanceConfig) is given, the asset must also be
+    storable under it (data-protection / GDPR / rule 4) or DataProtectionError is
+    raised before anything is written.
     """
     grounded = {entry.field_name for entry in bundle.provenance}
     missing = ungrounded_fields(bundle.asset, grounded)
@@ -73,6 +76,13 @@ def save_asset(session: Session, bundle: AssetBundle) -> Asset:
         raise GroundingError(
             "ungrounded factual fields (no source -> no claim): " + ", ".join(missing)
         )
+
+    if policy is not None:
+        from .governance import assert_storable
+
+        asset_type = bundle.asset.asset_type.value
+        for licence in {entry.source.licence.value for entry in bundle.provenance}:
+            assert_storable(asset_type, licence, policy)
 
     asset = bundle.asset
     session.add(asset)

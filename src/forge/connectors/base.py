@@ -103,11 +103,14 @@ class Connector(ABC):
         session: Session,
         *,
         skip_existing: bool = True,
+        policy=None,
     ) -> IngestReport:
         """Ingest each ref, isolating failures and skipping what already exists.
 
         A failure in one stage of one ref is recorded and the run continues — a
-        failing source must not block the others (rule 7).
+        failing source must not block the others (rule 7). A governance ``policy``
+        is enforced at the store seam (a blocked asset is recorded as a failure,
+        not raised).
         """
         report = IngestReport()
         seen = self.existing_locators(session) if skip_existing else set()
@@ -131,7 +134,7 @@ class Connector(ABC):
                     report.skipped.append(locator)
                     continue
                 try:
-                    saved = save_asset(session, bundle)
+                    saved = save_asset(session, bundle, policy=policy)
                 except Exception as exc:  # noqa: BLE001
                     session.rollback()
                     report.failed.append(RecordError(ref, "save", str(exc)))

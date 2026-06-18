@@ -9,6 +9,22 @@ hosted-LLM calls + a transparent scoring model + a light interface. The value is
 the **method** — the four streams, the grounding rule, the scoring rubric, the
 routing logic — not novel algorithms.
 
+## Governance (cross-cutting)
+
+`config/governance.yaml` + `forge.governance` enforce the agreed policy at the
+engine's seams:
+
+- **RBAC** — roles map to permissions (`viewer`/`analyst`/`committee`/`admin`);
+  the CLI authorizes every command before it runs (role from `FORGE_ROLE`).
+- **Data protection (GDPR / rule 4)** — in `development` mode the asset store
+  accepts only synthetic/public data and blocks personal/confidential asset types
+  (e.g. invention disclosures); those enter under `production_eu`. Enforced at
+  `save_asset` and the connector ingest loop.
+- **Data residency (EU-hosting)** — hosted-LLM endpoints are checked against the
+  EU-hosting policy: advisory in development, enforced in `production_eu`.
+- **Grounding / audit & prompt-injection hygiene** are built into the data model
+  and the LLM profiling prompt (see earlier slices).
+
 ## CLI
 
 Installing the package registers a `forge` command (DB URL from
@@ -145,6 +161,7 @@ Five layers + cross-cutting governance:
 - **L5 Output** — market-context briefs, committee dashboard, decision capture.
   ← *brief generator + decision/outcome capture + dashboard implemented here.*
 - **Governance** — grounding/audit, RBAC, GDPR/EU-hosting, prompt-injection hygiene.
+  ← *RBAC + data-protection + EU-hosting residency implemented here.*
 
 ## Non-negotiable rules (how this code is shaped)
 
@@ -264,6 +281,7 @@ system binaries for the duration of the run. Point them at an existing database
 - `config/corroboration.yaml` — thresholds for cross-stream agreement/conflict.
 - `config/recalibration.yaml` — outcome-quality mapping + recalibration thresholds.
 - `config/sectors.yaml` — the sector taxonomy for L4 clustering.
+- `config/governance.yaml` — RBAC roles, data-protection mode, EU-hosting policy.
 - `FORGE_DATABASE_URL` — database connection (see `.env.example`). Secrets and
   API keys go in the environment, never in source.
 
@@ -289,7 +307,8 @@ system binaries for the duration of the run. Point them at an existing database
 - L4 capital_intensity + team_availability dimensions (indeterminate until cost/
   TRL and internal team data land); persisting scores/clusters across the store.
 - L5 dashboard UI (the read model is built; the web front-end is out of scope here);
-  recalibration *applying* proposals automatically (it only proposes today);
-  governance (RBAC, EU-hosting).
+  recalibration *applying* proposals automatically (it only proposes today).
+- Authentication / identity is out of scope: RBAC enforces a role supplied via
+  `FORGE_ROLE`; binding roles to authenticated users belongs to the deployment.
 
 Build order and full scope live in the project context (`CLAUDE.md` equivalent).

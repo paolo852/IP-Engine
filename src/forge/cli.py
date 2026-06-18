@@ -27,8 +27,24 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .config import load_governance_config
 from .db.base import create_db_engine, get_database_url, make_session_factory
 from .db.models import Asset, DecisionType, OutcomeType
+from .governance import GovernanceError, Principal, authorize
+
+# Each command requires a permission; RBAC is enforced before the command runs.
+COMMAND_PERMISSIONS = {
+    "db": "migrate",
+    "assets": "view",
+    "ingest-epo": "ingest",
+    "dormancy": "view",
+    "pipeline": "run_pipeline",
+    "cluster": "view",
+    "dashboard": "view",
+    "decide": "decide",
+    "outcome": "record_outcome",
+    "recalibrate": "recalibrate",
+}
 
 
 def _asset_ids(session: Session, args) -> list[uuid.UUID]:
@@ -65,7 +81,8 @@ def cmd_ingest_epo(args, session: Session) -> int:
     from .connectors.epo_ops import EpoOpsConnector, OpsClient, OpsSettings
 
     settings = OpsSettings.from_config(load_connectors_config("config/connectors.yaml"))
-    report = EpoOpsConnector(OpsClient(settings)).run(args.refs, session)
+    # The governance policy guards what may be stored (GDPR / rule 4).
+    report = EpoOpsConnector(OpsClient(settings)).run(args.refs, session, policy=args.gov)
     print(f"EPO OPS ingest: {report.summary()}")
     for f in report.failed:
         print(f"  FAILED {f.ref} [{f.stage}]: {f.error}")
@@ -96,8 +113,15 @@ def cmd_pipeline(args, session: Session) -> int:
     from .llm import build_provider
     from .pipeline import Pipeline, PipelineConfig
 
+    from .governance import assert_residency
+
     config = PipelineConfig.from_files()
-    provider = build_provider(load_llm_config("config/llm.yaml"))
+    llm_config = load_llm_config("config/llm.yaml")
+    # EU-hosting policy: raise in production_eu if non-EU; advisory warning in dev.
+    ok, reason = assert_residency(llm_config.base_url, args.gov)
+    if not ok:
+        print(f"warning: {reason}", file=sys.stderr)
+    provider = build_provider(llm_config)
 
     s2_client = s1_client = None
     if os.environ.get("FORGE_EPO_OPS_KEY"):
@@ -279,10 +303,30 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     if not getattr(args, "command", None):
-        build_parser().print_help()
+        parser.print_help()
         return 2
+
+    # Governance: load the policy and authorize (RBAC) before touching anything.
+    try:
+        gov = load_governance_config(
+            os.environ.get("FORGE_GOVERNANCE_CONFIG", "config/governance.yaml")
+        )
+        principal = Principal(
+            name=os.environ.get("FORGE_USER", "cli"),
+            role=os.environ.get("FORGE_ROLE", "admin"),
+        )
+        authorize(principal, COMMAND_PERMISSIONS.get(args.command, "admin"), gov)
+    except GovernanceError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # config load problems
+        print(f"error: governance config: {exc}", file=sys.stderr)
+        return 1
+    args.gov = gov
+
     try:
         session = make_session_factory(create_db_engine(get_database_url()))()
     except RuntimeError as exc:
@@ -290,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         return args.func(args, session)
-    except (RuntimeError, ValueError) as exc:  # friendly env/credential/input errors
+    except (GovernanceError, RuntimeError, ValueError) as exc:  # friendly errors
         session.rollback()
         print(f"error: {exc}", file=sys.stderr)
         return 1
