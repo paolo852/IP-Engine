@@ -91,9 +91,9 @@ it against any external Postgres. The entrypoint can migrate and seed on boot
 (`FORGE_AUTO_MIGRATE=1`, `FORGE_AUTO_SEED=1`):
 
 ```bash
-# Local, with docker compose (set FORGE_DATABASE_URL in .env first):
-cp .env.example .env        # point FORGE_DATABASE_URL at your Supabase project
+# Self-contained: bundled Postgres + UI, zero external setup.
 docker compose up --build   # migrates + seeds + serves on http://localhost:8000
+# (to use your own DB instead, set FORGE_DATABASE_URL in a .env file)
 
 # Or plain docker against a remote DB:
 docker build -t forge-demo .

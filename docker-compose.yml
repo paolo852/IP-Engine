@@ -1,17 +1,36 @@
-# Run the FORGE demo UI against an external Postgres (e.g. a Supabase project).
+# Self-contained FORGE demo: a bundled Postgres + the web UI. Zero external setup.
 #
-#   cp .env.example .env   # set FORGE_DATABASE_URL to your Supabase connection
 #   docker compose up --build
+#   open http://localhost:8000
 #
-# Then open http://localhost:8000. Set FORGE_AUTO_MIGRATE/FORGE_AUTO_SEED=1 in
-# .env to migrate and load the synthetic demo on first boot.
+# On first boot the entrypoint migrates the schema and loads the synthetic demo
+# data (FORGE_AUTO_MIGRATE / FORGE_AUTO_SEED). To use your own database instead
+# (e.g. a Supabase project), set FORGE_DATABASE_URL in a .env file and the bundled
+# db is simply ignored.
 services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: forge
+      POSTGRES_PASSWORD: forge
+      POSTGRES_DB: forge
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forge -d forge"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    # Uncomment to inspect the DB from the host:
+    # ports: ["5432:5432"]
+
   forge:
     build: .
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
-      FORGE_DATABASE_URL: ${FORGE_DATABASE_URL}
+      FORGE_DATABASE_URL: ${FORGE_DATABASE_URL:-postgresql+psycopg2://forge:forge@db:5432/forge}
       FORGE_AUTO_MIGRATE: ${FORGE_AUTO_MIGRATE:-1}
       FORGE_AUTO_SEED: ${FORGE_AUTO_SEED:-1}
       FORGE_ROLE: ${FORGE_ROLE:-admin}
