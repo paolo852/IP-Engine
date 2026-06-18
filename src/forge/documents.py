@@ -116,16 +116,49 @@ def _clean(text: str) -> str:
     return re.sub(r"[ \t]+", " ", text).strip()
 
 
+# Patent front-page boilerplate that should never be part of a title — INID codes
+# like (71)/(73), the applicant/assignee/inventor lines, and classification fields.
+_TITLE_STOP = re.compile(
+    r"\(\s*\d{2}\s*\)|\bApplicant\b|\bAssignee\b|\bInventor|\bU\.?\s?S\.?\s?Cl\b|"
+    r"\bInt\.?\s?Cl\b|\bCPC\b|\bField of\b|\bPrior Publication\b|\bRelated\s+U\.?\s?S\b",
+    re.I,
+)
+
+
+def _clean_title(text: str) -> str | None:
+    """Strip patent front-page noise from a candidate title line.
+
+    Cuts at the first boilerplate marker (INID code, applicant, classification),
+    drops a leading (54)/'Title of Invention'/patent-number prefix, and trims
+    stray punctuation. Returns None if nothing title-like remains.
+    """
+    s = _clean(text)
+    cut = _TITLE_STOP.search(s)
+    if cut:
+        s = s[: cut.start()]
+    s = re.sub(r"^\s*\(\s*54\s*\)\s*", "", s, flags=re.I)
+    s = re.sub(r"^\s*title of (?:the )?invention\s*[:\-]?\s*", "", s, flags=re.I)
+    s = re.sub(r"^\s*(?:united states patent|patent no\.?|US|EP|WO)\b[\s\d,./-]*", "", s, flags=re.I)
+    s = _clean(s.strip(" .,:;-@#*|()/"))
+    letters = sum(c.isalpha() for c in s)
+    return s if letters >= 6 and len(s) <= 160 else None
+
+
 def _first_title(text: str) -> str | None:
-    # Prefer an explicit "Title of Invention" / (54) marker; else the first
-    # substantial line that reads like a title.
-    m = re.search(r"(?:title of (?:the )?invention|(\(\s*54\s*\)))\s*[:\-]?\s*(.+)", text, re.I)
-    if m and m.group(2).strip():
-        return _clean(m.group(2))[:300]
+    # Prefer an explicit "Title of Invention" / (54) marker (cleaned), else the
+    # first substantial line that reads like a title once boilerplate is stripped.
+    m = re.search(r"(?:title of (?:the )?invention|\(\s*54\s*\))\s*[:\-]?\s*(.+)", text, re.I)
+    if m:
+        cleaned = _clean_title(m.group(1))
+        if cleaned:
+            return cleaned
     for line in text.splitlines():
         s = _clean(line)
-        if 15 <= len(s) <= 200 and " " in s and not _HEADINGS.match(s) and any(c.isalpha() for c in s):
-            return s
+        if not s or _HEADINGS.match(s) or " " not in s:
+            continue
+        cleaned = _clean_title(s)
+        if cleaned:
+            return cleaned
     return None
 
 

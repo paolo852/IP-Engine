@@ -61,6 +61,18 @@ def test_extract_fields_from_patent():
     assert "sulfide glass electrolyte" in fields["claims_or_description"].lower()
 
 
+def test_title_strips_patent_front_page_boilerplate():
+    # A messy USPTO front-page text layer (INID codes, applicant, CPC run together).
+    messy = (
+        "NANOSCALE SCANNING SENSORS @ ( 71 ) Applicant : PRESIDENT AND FELLOWS OF "
+        "HARVARD COLLEGE , Cambridge , MA ( US ) ( 52 ) U . S . Cl . CPC ..... G01Q\n"
+        "(57) Abstract\nA nanoscale sensor detects magnetic fields.\n"
+    )
+    fields = extract_fields(messy, AssetType.patent)
+    assert fields["title"] == "NANOSCALE SCANNING SENSORS"
+    assert "Applicant" not in fields["title"] and "(" not in fields["title"]
+
+
 def test_extract_fields_from_result():
     fields = extract_fields(RESULT_TEXT, AssetType.project_result)
     assert "abstract" in fields
