@@ -9,6 +9,16 @@ hosted-LLM calls + a transparent scoring model + a light interface. The value is
 the **method** — the four streams, the grounding rule, the scoring rubric, the
 routing logic — not novel algorithms.
 
+## End-to-end orchestration
+
+`forge.pipeline.Pipeline` runs the whole method over a batch of assets — for each
+one: dormancy → LLM profiling (persisted) → the four streams (persisted evidence)
+→ corroboration → ventureability scoring → grounded brief. It is fault-tolerant
+(a failing step or stream is captured; one asset never blocks the rest) and
+idempotent (profile + evidence are replaced on re-run, not duplicated). Stream
+clients (S2/S1) are injected; S3/S4 run offline. See `scripts/pipeline_demo.py`
+for ingest → pipeline → committee decision → dashboard in one self-contained run.
+
 ## Status
 
 Implemented so far:
@@ -199,6 +209,9 @@ python scripts/dashboard_demo.py
 
 # Run the quarterly recalibration loop over synthetic history (throwaway DB):
 python scripts/recalibration_demo.py
+
+# Run the WHOLE method end to end: ingest -> pipeline -> decision -> dashboard:
+python scripts/pipeline_demo.py
 ```
 
 ### Tests
@@ -238,8 +251,11 @@ system binaries for the duration of the run. Point them at an existing database
   the brief inputs.
 - OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
   names need a biblio follow-up per citing doc — currently fake-only).
-- Wiring profiling/streams into a batch enrichment pass over the store, and a
-  real-LLM/real-OPS smoke path (services exist; live runs need credentials).
+- A scheduler/CLI around the orchestration (the `Pipeline` runs a batch in-process
+  and is idempotent; a cron/queue front-end and a real-LLM/real-API smoke path —
+  which need credentials — are not built).
+- Persisting ventureability scores/briefs (the pipeline returns them in memory and
+  decisions snapshot the score; a dedicated score table is not yet added).
 - Persisting dormancy verdicts + a batch "dormancy sweep" over the store (the
   rule engine exists; wiring it across the DB and recording results is later).
 - L4 capital_intensity + team_availability dimensions (indeterminate until S1

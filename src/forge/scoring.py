@@ -234,9 +234,11 @@ def _regulatory_pathway(inp: ScoringInputs, sc: dict) -> DimensionScore:
 
 
 def _capital_intensity(inp: ScoringInputs, sc: dict) -> DimensionScore:
+    # Capital intensity is cost-to-build, not capital *available* (that is S1's
+    # market_pull). No cost/TRL signal is wired yet, so this stays indeterminate.
     return DimensionScore(
         "capital_intensity", None,
-        "no capital/funding signal yet (S1 Dealroom not ingested)", [],
+        "no cost/TRL signal yet (capital intensity != funding availability)", [],
     )
 
 

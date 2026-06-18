@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from .db.models import (
@@ -180,6 +180,23 @@ def get_profile(session: Session, asset_id: uuid.UUID) -> AssetProfile | None:
         )
     )
     return session.execute(stmt).scalar_one_or_none()
+
+
+def delete_profile(session: Session, asset_id: uuid.UUID) -> None:
+    """Remove an asset's profile (and its grounding, via cascade). For re-runs."""
+    session.execute(delete(AssetProfile).where(AssetProfile.asset_id == asset_id))
+    session.commit()
+
+
+def delete_evidence(
+    session: Session, asset_id: uuid.UUID, *, streams: set[str] | None = None
+) -> None:
+    """Remove an asset's evidence (optionally only for given streams). For re-runs."""
+    stmt = delete(Evidence).where(Evidence.asset_id == asset_id)
+    if streams is not None:
+        stmt = stmt.where(Evidence.stream.in_(list(streams)))
+    session.execute(stmt)
+    session.commit()
 
 
 def save_stream_result(session: Session, asset: Asset, result) -> list[Evidence]:

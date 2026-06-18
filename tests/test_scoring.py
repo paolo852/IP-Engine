@@ -64,7 +64,7 @@ def test_capital_and_team_are_indeterminate_not_fabricated():
     score = score_ventureability(full_inputs(), CONFIG)
     assert score.dimension("capital_intensity").value is None
     assert score.dimension("team_availability").value is None
-    assert "S1 Dealroom" in score.dimension("capital_intensity").rationale
+    assert "cost/TRL" in score.dimension("capital_intensity").rationale
 
 
 def test_each_scored_dimension_exposes_its_evidence():
