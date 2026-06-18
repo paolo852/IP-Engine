@@ -51,11 +51,18 @@ A server-rendered FastAPI app presents the engine's output: the ranked committee
 dashboard, and per-asset detail with the transparent ventureability breakdown,
 dormancy verdict, grounded problem/solution (with verbatim quotes), cross-stream
 evidence (each with its provenance), and forms for the committee to record
-decisions/outcomes. An **Add asset** form (`/new`, requires the `ingest`
-permission) lets you load a patent from the literature — paste its title,
-abstract, claim text, status and a source URL — and the engine profiles,
-cross-references and scores it on the spot (offline). Governance applies: in
-`development` only public/free/synthetic data is accepted (rule 4). It only *presents* what the engine persisted — no scoring or
+decisions/outcomes. **Upload a document** (`/upload`) — a PDF or text file — and
+the system extracts the text, **classifies it (patent vs unpatented result) by
+explicit, auditable markers**, pulls out title/abstract/claims, and runs its
+analysis; an **Add asset** form (`/new`) does the same from typed fields. Both
+require the `ingest` permission and apply governance: in `development` only
+public/free/synthetic data is accepted (rule 4).
+
+Profiling provider: if `FORGE_LLM_API_KEY` (or `ANTHROPIC_API_KEY`) is set, the
+hosted LLM turns claims/technology statements into reframed problem-space,
+solution and application scenarios (each still grounded by a verbatim quote).
+Without a key the **offline** provider runs — it copies verbatim spans so the
+demo works credential-free, but it does *not* reframe; the asset page says so. It only *presents* what the engine persisted — no scoring or
 grounding logic lives in the web layer, so the UI can never diverge from the
 method. Writes are RBAC-gated by the same governance policy as the CLI (role from
 `FORGE_ROLE`).

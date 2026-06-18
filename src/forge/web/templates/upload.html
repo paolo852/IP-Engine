@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Upload a document — FORGE{% endblock %}
+{% block content %}
+<p class="back"><a href="/">&larr; dashboard</a></p>
+<h2 style="font-size:19px;margin:0 0 2px">Upload a document</h2>
+<p class="muted" style="margin:0 0 16px">
+  Drop in a PDF or text file — a published patent, or an unpatented research
+  result (paper, deliverable, thesis). The system reads the text, decides
+  <strong>which kind it is</strong>, extracts the relevant fields, and runs its
+  analysis. No form to fill.
+</p>
+
+{% if error %}<div class="banner" style="margin-bottom:16px"><strong>Couldn't process:</strong> {{ error }}</div>{% endif %}
+
+<div class="banner" style="background:#eef2ff;border-color:#c7d2fe;color:#3730a3;margin-bottom:18px">
+  Mode <strong>{{ mode }}</strong>: upload only <strong>public</strong> literature or
+  <strong>synthetic</strong> examples (rule 4) — no real confidential material.
+</div>
+
+<form method="post" action="/upload" enctype="multipart/form-data">
+  <div class="card">
+    <div class="dim"><span class="name">Document</span>
+      <input type="file" name="file" accept=".pdf,.txt,.md,.text" required></div>
+    <div class="dim"><span class="name">Licence</span>
+      <select name="licence">
+        {% for l in licences %}<option value="{{ l.value }}" {{ 'selected' if l.value=='public' else '' }}>{{ l.value }}</option>{% endfor %}
+      </select>
+      <span class="why">how the source data may be used (governs storage)</span>
+    </div>
+    <button type="submit">Analyse document</button>
+    <a href="/new" class="back" style="margin-left:12px">or fill a form instead</a>
+  </div>
+</form>
+
+<p class="src">
+  Scanned PDFs with no text layer can't be read (OCR is out of scope) — the system
+  will say so rather than invent content. Extraction is best-effort; you can review
+  every field on the asset page afterwards.
+</p>
+{% endblock %}

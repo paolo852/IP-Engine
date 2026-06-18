@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -24,6 +24,7 @@ from ..config import (
 )
 from ..db.base import create_db_engine, get_database_url, make_session_factory
 from ..db.models import Asset, AssetType, DecisionType, Licence, OutcomeType, Source
+from ..documents import DocumentError, parse_document
 from ..dormancy import assess_asset
 from ..governance import (
     AuthorizationError,
@@ -159,7 +160,7 @@ def create_app(
             )
             asset = save_asset(session, bundle, policy=gov)
             asset_id = asset.id
-            _score_offline(session, [asset_id], config_dir)
+            _score_asset(session, [asset_id], config_dir)
         except (DataProtectionError, GroundingError, GovernanceError, ValueError) as exc:
             session.rollback()
             # Bounce back to the form with a readable message (governance/grounding).
@@ -170,8 +171,63 @@ def create_app(
             session.close()
         return RedirectResponse(url=f"/asset/{asset_id}", status_code=303)
 
+    @app.get("/upload", response_class=HTMLResponse)
+    def upload_form(request: Request, error: str | None = None) -> HTMLResponse:
+        principal = _principal()
+        if not _can(principal, "ingest"):
+            raise HTTPException(status_code=403, detail="role may not add assets")
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "upload.html",
+            {
+                "principal": principal,
+                "mode": gov.mode,
+                "error": error,
+                "licences": [Licence.public, Licence.free, Licence.synthetic],
+            },
+        )
+
+    @app.post("/upload")
+    async def upload_document(
+        file: UploadFile = File(...),
+        licence: str = Form("public"),
+    ):
+        principal = _principal()
+        try:
+            authorize(principal, "ingest", gov)
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+
+        from urllib.parse import quote
+
+        raw = await file.read()
+        try:
+            parsed = parse_document(file.filename or "document", raw)
+        except DocumentError as exc:
+            return RedirectResponse(url=f"/upload?error={quote(str(exc))}", status_code=303)
+
+        session = session_factory()
+        try:
+            bundle = _bundle_from_parsed(parsed, file.filename or "document", licence)
+            asset = save_asset(session, bundle, policy=gov)
+            asset_id = asset.id
+            _score_asset(session, [asset_id], config_dir)
+        except (DataProtectionError, GroundingError, GovernanceError, ValueError) as exc:
+            session.rollback()
+            return RedirectResponse(url=f"/upload?error={quote(str(exc))}", status_code=303)
+        finally:
+            session.close()
+
+        # Carry the (explainable) classification onto the detail page as a banner.
+        note = quote(
+            f"Classified as {parsed.classification.label} — "
+            f"{', '.join(parsed.classification.reasons[:3])}. "
+            "Fields were auto-extracted; review them below."
+        )
+        return RedirectResponse(url=f"/asset/{asset_id}?note={note}", status_code=303)
+
     @app.get("/asset/{asset_id}", response_class=HTMLResponse)
-    def asset_detail(request: Request, asset_id: str) -> HTMLResponse:
+    def asset_detail(request: Request, asset_id: str, note: str | None = None) -> HTMLResponse:
         principal = _principal()
         try:
             aid = uuid.UUID(asset_id)
@@ -203,6 +259,7 @@ def create_app(
                 "principal": principal,
                 "can_decide": _can(principal, "decide"),
                 "can_record_outcome": _can(principal, "record_outcome"),
+                "note": note,
             }
             return _TEMPLATES.TemplateResponse(request, "asset.html", ctx)
         finally:
@@ -347,10 +404,52 @@ def _bundle_from_form(
     return AssetBundle(asset=asset, provenance=provenance)
 
 
-def _score_offline(session, asset_ids, config_dir: str) -> None:
-    """Score freshly-added assets with the offline pipeline (no LLM key needed)."""
-    from ..pipeline import Pipeline, PipelineConfig
+def _bundle_from_parsed(parsed, filename: str, licence: str) -> AssetBundle:
+    """Build a grounded AssetBundle from an auto-parsed uploaded document.
+
+    The document is the source: the asset_type comes from the (explainable)
+    classification, the extracted fields are grounded to the file, and governance
+    decides storability for the chosen licence.
+    """
+    asset = Asset(
+        asset_type=parsed.asset_type,
+        source_layer="L1.upload",
+        title=parsed.fields.get("title"),
+        abstract=parsed.fields.get("abstract"),
+        claims_or_description=parsed.fields.get("claims_or_description"),
+    )
+    source = Source(source_type="upload", licence=Licence(licence), locator=filename)
+    provenance = [
+        ProvenanceEntry(field_name=name, source=source, note="auto-extracted from upload")
+        for name in asset.populated_groundable_fields()
+    ]
+    return AssetBundle(asset=asset, provenance=provenance)
+
+
+def _profiling_provider(config_dir: str):
+    """Use the real LLM when a key is configured, else the offline placeholder.
+
+    The hosted LLM is what turns claims/technology statements into reframed
+    problem/solution/application scenarios (still quote-grounded). Without a key,
+    the offline provider only copies verbatim spans — honest, but not reframed.
+    """
+    from ..llm.provider import API_KEY_ENV
     from ..seed import OfflineProfilingProvider
 
+    if os.environ.get(API_KEY_ENV) or os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            from ..config import load_llm_config
+            from ..llm.provider import build_provider
+
+            return build_provider(load_llm_config(f"{config_dir}/llm.yaml"))
+        except Exception:  # noqa: BLE001 - fall back rather than fail the add
+            return OfflineProfilingProvider()
+    return OfflineProfilingProvider()
+
+
+def _score_asset(session, asset_ids, config_dir: str) -> None:
+    """Profile, cross-reference and score freshly-added assets."""
+    from ..pipeline import Pipeline, PipelineConfig
+
     config = PipelineConfig.from_files(config_dir=config_dir)
-    Pipeline(config, OfflineProfilingProvider()).run(session, asset_ids)
+    Pipeline(config, _profiling_provider(config_dir)).run(session, asset_ids)

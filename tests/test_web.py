@@ -181,3 +181,75 @@ def test_add_asset_rejects_restricted_licence(client, session, monkeypatch):
     # Governance (rule 4) bounces it back to the form with an error, nothing stored.
     assert r.status_code == 303 and r.headers["location"].startswith("/new?error=")
     assert "Solid-state lithium battery" not in client.get("/").text
+
+
+_PATENT_DOC = (
+    "United States Patent\n"
+    "(54) Title of Invention: Solid-state lithium battery with sulfide electrolyte\n"
+    "(57) Abstract\n"
+    "A solid-state lithium battery reduces dendrite formation at high current density.\n\n"
+    "What is claimed is:\n"
+    "1. A battery cell comprising a sulfide glass electrolyte and a lithium additive.\n"
+).encode("utf-8")
+
+_RESULT_DOC = (
+    "Deliverable D3.2 — Work Package 3\n"
+    "A scalable enzymatic process for depolymerising mixed plastic waste\n\n"
+    "Abstract\n"
+    "This paper presents an enzymatic process for depolymerising plastic waste.\n\n"
+    "References\n[1] doi:10.1000/example.2021\n"
+).encode("utf-8")
+
+
+def test_upload_patent_classifies_and_scores(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    r = client.post(
+        "/upload",
+        files={"file": ("patent.txt", _PATENT_DOC, "text/plain")},
+        data={"licence": "public"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    loc = r.headers["location"]
+    assert loc.startswith("/asset/")
+    detail = client.get(loc).text
+    assert "patent" in detail.lower()
+    assert "Ventureability" in detail
+    assert "Classified as patent" in detail            # explainable classification note
+
+
+def test_upload_result_classified_as_unpatented(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    r = client.post(
+        "/upload",
+        files={"file": ("deliverable.txt", _RESULT_DOC, "text/plain")},
+        data={"licence": "public"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    detail = client.get(r.headers["location"]).text
+    assert "project_result" in detail            # asset type from classification
+    assert "Classified as unpatented result" in detail
+
+
+def test_upload_unreadable_document_bounces(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    r = client.post(
+        "/upload",
+        files={"file": ("empty.txt", b"   ", "text/plain")},
+        data={"licence": "public"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303 and r.headers["location"].startswith("/upload?error=")
+
+
+def test_viewer_cannot_upload(client, session, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "viewer")
+    assert client.get("/upload").status_code == 403
+    r = client.post(
+        "/upload",
+        files={"file": ("patent.txt", _PATENT_DOC, "text/plain")},
+        data={"licence": "public"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 403

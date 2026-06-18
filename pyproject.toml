@@ -21,6 +21,7 @@ web = [
     "uvicorn>=0.27",
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
+    "pypdf>=4.0",
 ]
 dev = [
     "pytest>=8.0",
@@ -28,6 +29,8 @@ dev = [
     "uvicorn>=0.27",
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
+    "pypdf>=4.0",
+    "fpdf2>=2.7",
 ]
 
 [build-system]

@@ -7,6 +7,15 @@
   {{ asset.asset_type.value }} · {{ asset.source_layer }} · legal status:
   {{ asset.legal_status or "unknown" }}
 </p>
+{% if note %}<div class="banner" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46;margin-bottom:16px">{{ note }}</div>{% endif %}
+{% if profile and profile.model.startswith('offline') %}
+<div class="banner" style="margin-bottom:16px">
+  Profiled with the <strong>offline</strong> placeholder (no LLM key set): problem/
+  solution/applications are copied verbatim from the text, <em>not</em> reframed.
+  Set <code>FORGE_LLM_API_KEY</code> to have the LLM turn the claims into genuine
+  problem-space statements and application scenarios (still quote-grounded).
+</div>
+{% endif %}
 
 <!-- ventureability ------------------------------------------------------->
 <div class="card">
