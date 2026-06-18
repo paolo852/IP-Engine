@@ -6,8 +6,11 @@
 # (FORGE_LLM_API_KEY, falling back to the SDK's own ANTHROPIC_API_KEY).
 
 provider: anthropic
-# Default to the latest, most capable Claude model for grounded enrichment.
-model: claude-opus-4-8
+# Model for grounded enrichment. Haiku keeps demo/profiling cost low; switch to
+# claude-opus-4-8 for the highest-quality, committee-grade reframing.
+model: claude-haiku-4-5
 # base_url: https://your-eu-hosted-gateway.example/anthropic
 max_tokens: 4096
-adaptive_thinking: true
+# Adaptive thinking is a 4.6+ feature — keep it off on Haiku 4.5 (would 400).
+# Turn it back on if you switch model to claude-opus-4-8 / claude-sonnet-4-6.
+adaptive_thinking: false
