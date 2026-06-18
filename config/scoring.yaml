@@ -21,3 +21,9 @@ scaling:
   citation_saturation: 5        # forward citations for ~full IP-validation credit
   neighbour_crowded: 100        # neighbour density treated as fully crowded
   funding_reference_eur: 10000000  # S1 funding (EUR) for full capital-pull credit
+
+# Coverage floor: if less than this share of the total weight could be scored
+# (too many dimensions indeterminate — usually because the cross-referencing found
+# no MARKET signal), the score is provisional and the Engine asks for human review
+# instead of presenting a confident-looking half-number. CONFIG, not code (rule 3).
+min_coverage: 0.5

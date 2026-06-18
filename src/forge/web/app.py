@@ -21,6 +21,7 @@ from ..config import (
     load_dormancy_config,
     load_governance_config,
     load_organisation_config,
+    load_scoring_config,
 )
 from ..db.base import create_db_engine, get_database_url, make_session_factory
 from ..db.models import Asset, AssetType, DecisionType, Licence, OutcomeType, Source
@@ -76,6 +77,7 @@ def create_app(
     )
     dormancy_cfg = load_dormancy_config(f"{config_dir}/dormancy.yaml")
     org_cfg = load_organisation_config(f"{config_dir}/organisation.yaml")
+    min_coverage = load_scoring_config(f"{config_dir}/scoring.yaml").min_coverage
 
     app.state.session_factory = session_factory
     app.state.governance = gov
@@ -350,12 +352,21 @@ def create_app(
             except ValueError:
                 dormancy = None  # no ruleset for this asset type
 
+            score = get_score(session, aid)
+            # Coverage-as-signal: an evidence-poor score (too many indeterminate
+            # dimensions — usually no MARKET signal found) is provisional, not a
+            # reliable number, and is surfaced as "needs human review".
+            low_evidence = score is None or score.ventureability is None or (
+                score.coverage < min_coverage
+            )
             ctx = {
                 "asset": asset,
                 "provenance": list(asset.provenance),
                 "dormancy": dormancy,
                 "profile": get_profile(session, aid),
-                "score": get_score(session, aid),
+                "score": score,
+                "low_evidence": low_evidence,
+                "min_coverage": min_coverage,
                 "evidence": get_evidence(session, aid),
                 "decision": latest_decision(session, aid),
                 "outcome": latest_outcome(session, aid),

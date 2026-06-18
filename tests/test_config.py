@@ -45,6 +45,29 @@ def test_scoring_scaling_is_loaded():
     assert cfg.scaling["neighbour_crowded"] == 100
 
 
+def test_scoring_min_coverage_loads_and_defaults(tmp_path):
+    assert 0.0 <= load_scoring_config(REPO_SCORING).min_coverage <= 1.0
+    # Absent -> sensible default.
+    p = tmp_path / "scoring.yaml"
+    p.write_text(
+        "weights:\n  technology_maturity: 0.2\n  market_pull: 0.25\n"
+        "  ip_defensibility: 0.2\n  capital_intensity: 0.1\n"
+        "  regulatory_pathway: 0.1\n  team_availability: 0.15\n"
+    )
+    assert load_scoring_config(p).min_coverage == 0.5
+
+
+def test_scoring_min_coverage_out_of_range_rejected(tmp_path):
+    p = tmp_path / "scoring.yaml"
+    p.write_text(
+        "min_coverage: 1.5\nweights:\n  technology_maturity: 0.2\n  market_pull: 0.25\n"
+        "  ip_defensibility: 0.2\n  capital_intensity: 0.1\n"
+        "  regulatory_pathway: 0.1\n  team_availability: 0.15\n"
+    )
+    with pytest.raises(ConfigError, match="min_coverage"):
+        load_scoring_config(p)
+
+
 def test_scoring_scaling_must_be_mapping(tmp_path):
     p = _write(
         tmp_path,

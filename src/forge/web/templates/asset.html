@@ -17,9 +17,21 @@
 </div>
 {% endif %}
 
+<!-- evidence-quality gate ------------------------------------------------->
+{% if low_evidence %}
+<div class="banner" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;margin-bottom:16px">
+  <strong>⚠ Insufficient market evidence — provisional, needs human review.</strong>
+  The cross-referencing found little or no signal
+  {% if score %}(coverage {{ "%.0f"|format(score.coverage * 100) }}%, below the {{ "%.0f"|format(min_coverage * 100) }}% floor){% endif %},
+  so this is <em>not</em> a reliable score. This usually means the search ran on the
+  asset's <em>technical</em> vocabulary rather than <em>market/application</em> terms —
+  an analyst should sharpen the candidate markets before trusting any ranking.
+</div>
+{% endif %}
+
 <!-- ventureability ------------------------------------------------------->
 <div class="card">
-  <h2>Ventureability</h2>
+  <h2>Ventureability {% if low_evidence %}<span class="pill watch" style="font-weight:600">provisional</span>{% endif %}</h2>
   {% if score %}
     <p>
       <span class="score" style="font-size:22px">
@@ -61,10 +73,14 @@
 </div>
 {% endif %}
 
-<!-- profile -------------------------------------------------------------->
+<!-- profile (search basis — internal, not the committee deliverable) ----->
 {% if profile %}
 <div class="card">
-  <h2>Problem &amp; solution <span class="muted" style="font-weight:400;font-size:12px">(grounded, model: {{ profile.model }})</span></h2>
+  <details>
+  <summary style="cursor:pointer;font-weight:600">Search basis — raw profile
+    <span class="muted" style="font-weight:400;font-size:12px">(internal: the problem/solution and market hypotheses used to drive the streams; model {{ profile.model }})</span>
+  </summary>
+  <p class="src" style="margin:8px 0 4px">This is the engine's <em>input</em>, not the committee's answer: it reframes the asset to generate market queries. What matters for a decision is the evidence and routing above — not this paraphrase.</p>
   {% set quotes = {} %}
   {% for g in profile.grounding %}{% if quotes.update({g.field_name: g}) %}{% endif %}{% endfor %}
   <p><strong>Problem.</strong> {{ profile.problem }}</p>
@@ -75,7 +91,8 @@
     <p><strong>Application.</strong> {{ app }}</p>
     {% if quotes.get('application[' ~ loop.index0 ~ ']') %}<div class="quote">“{{ quotes['application[' ~ loop.index0 ~ ']'].supporting_quote }}”<div class="src">— asset.{{ quotes['application[' ~ loop.index0 ~ ']'].source_field }}</div></div>{% endif %}
   {% endfor %}
-  <p class="src">Query terms: {{ profile.query_terms | join(", ") }}</p>
+  <p class="src">Market query terms (drive the streams): {{ profile.query_terms | join(", ") }}</p>
+  </details>
 </div>
 {% endif %}
 

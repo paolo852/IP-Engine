@@ -286,3 +286,44 @@ def test_viewer_cannot_ingest_epo(client, monkeypatch):
     assert client.post(
         "/ingest-epo", data={"refs": "EP1000000"}, follow_redirects=False
     ).status_code == 403
+
+
+def _ventureability(value, coverage):
+    from forge.scoring import DimensionScore, VentureabilityScore
+
+    dims = [DimensionScore("technology_maturity", value, "rationale")]
+    return VentureabilityScore(value, coverage, dims, {"technology_maturity": 1.0})
+
+
+def test_low_coverage_asset_flagged_for_human_review(client, session):
+    from forge.repository import save_asset, save_score
+
+    from .synthetic.assets import synthetic_patent_bundle
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    save_score(session, asset, _ventureability(0.6, 0.2), routing="watch")  # below floor
+    detail = client.get(f"/asset/{asset.id}").text
+    assert "Insufficient market evidence" in detail
+    assert "needs human review" in detail
+    assert "provisional" in detail
+
+
+def test_well_covered_asset_not_flagged(client, session):
+    from forge.repository import save_asset, save_score
+
+    from .synthetic.assets import synthetic_patent_bundle
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    save_score(session, asset, _ventureability(0.7, 0.85), routing="sprint")  # above floor
+    detail = client.get(f"/asset/{asset.id}").text
+    assert "Insufficient market evidence" not in detail
+
+
+def test_raw_profile_is_collapsed_search_basis(client, seeded):
+    from forge.db.models import Asset
+
+    asset = seeded.query(Asset).filter(Asset.title.like("Low-power photonic%")).one()
+    detail = client.get(f"/asset/{asset.id}").text
+    # The paraphrase is demoted to an expandable "search basis", not the headline.
+    assert "Search basis" in detail
+    assert "<details>" in detail

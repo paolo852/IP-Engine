@@ -53,6 +53,9 @@ class ScoringConfig:
 
     weights: dict[str, float]
     scaling: dict = field(default_factory=dict)
+    # Below this scorable-weight share, the score is treated as evidence-poor and
+    # flagged for human review rather than presented as a reliable number.
+    min_coverage: float = 0.5
 
     def weight(self, dimension: str) -> float:
         return self.weights[dimension]
@@ -99,7 +102,13 @@ def load_scoring_config(path: str | os.PathLike[str]) -> ScoringConfig:
     if not isinstance(scaling, dict):
         raise ConfigError("scoring 'scaling' must be a mapping if present")
 
-    return ScoringConfig(weights=weights, scaling=scaling)
+    min_coverage = data.get("min_coverage", 0.5)
+    if not isinstance(min_coverage, (int, float)) or isinstance(min_coverage, bool):
+        raise ConfigError(f"scoring 'min_coverage' must be a number, got {min_coverage!r}")
+    if not 0.0 <= float(min_coverage) <= 1.0:
+        raise ConfigError("scoring 'min_coverage' must be in [0, 1]")
+
+    return ScoringConfig(weights=weights, scaling=scaling, min_coverage=float(min_coverage))
 
 
 @dataclass(frozen=True)
