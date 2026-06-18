@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Ingest from EPO — FORGE{% endblock %}
+{% block content %}
+<p class="back"><a href="/">&larr; dashboard</a></p>
+<h2 style="font-size:19px;margin:0 0 2px">Ingest a patent from EPO (by number)</h2>
+<p class="muted" style="margin:0 0 16px">
+  Enter a publication number (e.g. <code>EP1000000</code>, <code>US8000000</code>) and
+  the engine pulls clean, structured data straight from EPO Open Patent Services —
+  title, abstract, applicants, dates — then profiles and scores it. Far cleaner than
+  parsing a PDF, and it brings real patent-citation signals (S2).
+</p>
+
+{% if error %}<div class="banner" style="margin-bottom:16px"><strong>Couldn't ingest:</strong> {{ error }}</div>{% endif %}
+
+{% if not has_key %}
+<div class="banner" style="margin-bottom:18px">
+  EPO OPS is not configured. Set <code>FORGE_EPO_OPS_KEY</code> and
+  <code>FORGE_EPO_OPS_SECRET</code> (free OAuth2 key from developers.epo.org) in the
+  environment, then reload.
+</div>
+{% else %}
+<div class="banner" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46;margin-bottom:18px">
+  EPO OPS configured ✓ — citation signals (S2) will enrich the score.
+</div>
+{% endif %}
+
+<form method="post" action="/ingest-epo">
+  <div class="card">
+    <div class="dim"><span class="name">Patent number(s)</span>
+      <input name="refs" required style="flex:1;min-width:280px"
+             placeholder="EP1000000  (space- or comma-separate several)"></div>
+    <button type="submit">Ingest &amp; score</button>
+    <a href="/upload" class="back" style="margin-left:12px">or upload a file</a>
+  </div>
+</form>
+
+<p class="src">
+  Free EPO OPS has a monthly quota; a failed or rate-limited call is reported here
+  and never corrupts the store. Public/free licence (rule 5): only a pointer to the
+  raw record is kept, never the licensed payload.
+</p>
+{% endblock %}

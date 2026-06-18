@@ -248,6 +248,89 @@ def create_app(
         )
         return RedirectResponse(url=f"/asset/{asset_id}?note={note}", status_code=303)
 
+    @app.get("/ingest-epo", response_class=HTMLResponse)
+    def ingest_epo_form(request: Request, error: str | None = None) -> HTMLResponse:
+        principal = _principal()
+        if not _can(principal, "ingest"):
+            raise HTTPException(status_code=403, detail="role may not add assets")
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "ingest_epo.html",
+            {
+                "principal": principal,
+                "mode": gov.mode,
+                "error": error,
+                "has_key": bool(os.environ.get("FORGE_EPO_OPS_KEY")),
+            },
+        )
+
+    @app.post("/ingest-epo")
+    def ingest_epo(refs: str = Form(...)):
+        principal = _principal()
+        try:
+            authorize(principal, "ingest", gov)
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+
+        from urllib.parse import quote
+
+        ref_list = [r for r in refs.replace(",", " ").split() if r]
+        if not ref_list:
+            return RedirectResponse(
+                url="/ingest-epo?error=" + quote("enter a patent number (e.g. EP1000000)"),
+                status_code=303,
+            )
+        if not os.environ.get("FORGE_EPO_OPS_KEY"):
+            return RedirectResponse(
+                url="/ingest-epo?error="
+                + quote("EPO OPS not configured: set FORGE_EPO_OPS_KEY and FORGE_EPO_OPS_SECRET"),
+                status_code=303,
+            )
+
+        session = session_factory()
+        try:
+            from ..config import load_connectors_config
+            from ..connectors.epo_ops import EpoOpsConnector, OpsClient, OpsSettings
+
+            settings = OpsSettings.from_config(
+                load_connectors_config(f"{config_dir}/connectors.yaml")
+            )
+            report = EpoOpsConnector(OpsClient(settings)).run(
+                ref_list, session, policy=gov
+            )
+        except Exception as exc:  # noqa: BLE001 - surface EPO/network errors
+            session.rollback()
+            session.close()
+            return RedirectResponse(
+                url="/ingest-epo?error=" + quote(f"EPO error: {exc}"), status_code=303
+            )
+
+        if not report.saved:
+            session.close()
+            if report.failed:
+                f = report.failed[0]
+                msg = f"{f.ref} [{f.stage}]: {f.error}"
+            else:
+                msg = "nothing new — those patents are already ingested"
+            return RedirectResponse(url="/ingest-epo?error=" + quote(msg), status_code=303)
+
+        # Clean biblio is stored; score it (S2 citations included since the EPO key
+        # is set). Best-effort scoring — the asset is kept either way.
+        asset_id = report.saved[0]
+        score_note = ""
+        try:
+            _score_asset(session, list(report.saved), config_dir)
+        except Exception as exc:  # noqa: BLE001
+            session.rollback()
+            score_note = f" Scoring incomplete: {exc}."
+        finally:
+            session.close()
+        note = quote(
+            f"Ingested {len(report.saved)} patent(s) from EPO OPS "
+            f"(clean biblio: title, abstract, dates)." + score_note
+        )
+        return RedirectResponse(url=f"/asset/{asset_id}?note={note}", status_code=303)
+
     @app.get("/asset/{asset_id}", response_class=HTMLResponse)
     def asset_detail(request: Request, asset_id: str, note: str | None = None) -> HTMLResponse:
         principal = _principal()

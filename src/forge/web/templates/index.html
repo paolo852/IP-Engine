@@ -5,7 +5,8 @@
   <h2 style="font-size:18px;margin:0">Committee dashboard</h2>
   <span style="flex:1"></span>
   {% if can_ingest %}
-    <a href="/upload" style="text-decoration:none"><button type="button">⬆ Upload document</button></a>
+    <a href="/ingest-epo" style="text-decoration:none"><button type="button">🔎 EPO by number</button></a>
+    <a href="/upload" style="text-decoration:none"><button type="button" class="secondary">⬆ Upload file</button></a>
     <a href="/new" style="text-decoration:none"><button type="button" class="secondary">+ Add manually</button></a>
   {% endif %}
 </div>

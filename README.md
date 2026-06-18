@@ -51,12 +51,18 @@ A server-rendered FastAPI app presents the engine's output: the ranked committee
 dashboard, and per-asset detail with the transparent ventureability breakdown,
 dormancy verdict, grounded problem/solution (with verbatim quotes), cross-stream
 evidence (each with its provenance), and forms for the committee to record
-decisions/outcomes. **Upload a document** (`/upload`) — a PDF or text file — and
-the system extracts the text, **classifies it (patent vs unpatented result) by
-explicit, auditable markers**, pulls out title/abstract/claims, and runs its
-analysis; an **Add asset** form (`/new`) does the same from typed fields. Both
-require the `ingest` permission and apply governance: in `development` only
-public/free/synthetic data is accepted (rule 4).
+decisions/outcomes. Three ways to bring in an asset (all need the `ingest`
+permission and apply governance — `development` accepts only public/free/synthetic
+data, rule 4):
+
+- **EPO by number** (`/ingest-epo`) — enter a publication number (`EP1000000`) and
+  the engine pulls clean structured biblio from EPO OPS (title, abstract,
+  applicants, dates) and adds S2 citation signals. The cleanest path for real
+  patents (needs the free `FORGE_EPO_OPS_KEY`).
+- **Upload a document** (`/upload`) — a PDF or text file; the system extracts the
+  text, **classifies it (patent vs unpatented result) by explicit, auditable
+  markers**, and pulls out title/abstract/claims.
+- **Add manually** (`/new`) — from typed fields.
 
 Profiling provider: if `FORGE_LLM_API_KEY` (or `ANTHROPIC_API_KEY`) is set, the
 hosted LLM turns claims/technology statements into reframed problem-space,

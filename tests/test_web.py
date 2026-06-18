@@ -253,3 +253,36 @@ def test_viewer_cannot_upload(client, session, monkeypatch):
         follow_redirects=False,
     )
     assert r.status_code == 403
+
+
+def test_ingest_epo_form_renders(client, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    monkeypatch.delenv("FORGE_EPO_OPS_KEY", raising=False)
+    r = client.get("/ingest-epo")
+    assert r.status_code == 200
+    assert "Ingest a patent from EPO" in r.text
+    assert "not configured" in r.text  # no key -> the warning shows
+
+
+def test_ingest_epo_without_key_reports_error(client, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    monkeypatch.delenv("FORGE_EPO_OPS_KEY", raising=False)
+    r = client.post("/ingest-epo", data={"refs": "EP1000000"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"].startswith("/ingest-epo?error=")
+    assert "FORGE_EPO_OPS_KEY" in r.headers["location"]
+
+
+def test_ingest_epo_empty_input_reports_error(client, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "admin")
+    r = client.post("/ingest-epo", data={"refs": "   "}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"].startswith("/ingest-epo?error=")
+
+
+def test_viewer_cannot_ingest_epo(client, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "viewer")
+    assert client.get("/ingest-epo").status_code == 403
+    assert client.post(
+        "/ingest-epo", data={"refs": "EP1000000"}, follow_redirects=False
+    ).status_code == 403
