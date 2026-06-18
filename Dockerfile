@@ -21,6 +21,7 @@ RUN pip install --upgrade pip && pip install '.[web]'
 # Runtime files alembic + the engine read relative to the working directory.
 COPY alembic.ini ./
 COPY config ./config
+COPY data ./data
 COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
 RUN chmod +x ./scripts/entrypoint.sh
 

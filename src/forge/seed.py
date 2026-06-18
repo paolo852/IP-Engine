@@ -19,12 +19,19 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db.models import Asset, AssetType, Licence, Source
+from .db.models import Asset, AssetType, FieldProvenance, Licence, Source
 from .llm.provider import LLMResponse
 from .pipeline import Pipeline, PipelineConfig
-from .repository import AssetBundle, ProvenanceEntry, get_asset, save_asset
+from .repository import (
+    AssetBundle,
+    ProvenanceEntry,
+    get_asset,
+    get_score,
+    save_asset,
+)
 
 # -- offline profiling provider --------------------------------------------
 _STOPWORDS = {
@@ -281,10 +288,25 @@ def seed_demo(
             session.rollback()
             errors.append(f"{locator}: {exc}")
 
-    if run_pipeline and new_ids:
+    # Self-healing: score the assets just created PLUS any demo asset left
+    # unscored by an earlier partial run (e.g. a deploy that created rows but
+    # crashed before scoring). Idempotent — already-scored assets are skipped.
+    to_score = list(new_ids)
+    demo_locators = [b.provenance[0].source.locator for b in synthetic_demo_bundles()]
+    existing_demo_ids = session.execute(
+        select(FieldProvenance.asset_id)
+        .join(Source, FieldProvenance.source_id == Source.id)
+        .where(Source.locator.in_(demo_locators))
+        .distinct()
+    ).scalars()
+    for aid in existing_demo_ids:
+        if aid not in to_score and get_score(session, aid) is None:
+            to_score.append(aid)
+
+    if run_pipeline and to_score:
         config = PipelineConfig.from_files(as_of=as_of)
         pipe = Pipeline(config, OfflineProfilingProvider())
-        report = pipe.run(session, new_ids)
+        report = pipe.run(session, to_score)
         for r in report.results:
             if r.score is not None:
                 scored += 1

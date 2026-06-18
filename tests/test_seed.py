@@ -52,6 +52,25 @@ def test_seed_demo_is_idempotent(session):
     assert second.skipped == len(synthetic_demo_bundles())
 
 
+def test_seed_demo_self_heals_unscored_assets(session):
+    # Simulate a partial run: assets created but never scored.
+    first = seed_demo(session, as_of=AS_OF, run_pipeline=False)
+    assert first.created == len(synthetic_demo_bundles())
+    assert first.scored == 0
+
+    from forge.db.models import Asset
+
+    for asset in session.query(Asset).all():
+        assert get_score(session, asset.id) is None
+
+    # Re-running seeds nothing new but scores the previously-unscored assets.
+    second = seed_demo(session, as_of=AS_OF)
+    assert second.created == 0
+    assert second.scored == len(synthetic_demo_bundles())
+    for asset in session.query(Asset).all():
+        assert get_score(session, asset.id) is not None
+
+
 def test_seed_demo_respects_governance_policy(session):
     from forge.config import load_governance_config
 
