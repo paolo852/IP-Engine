@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import time
 import urllib.parse
 from dataclasses import dataclass
@@ -132,10 +133,35 @@ class OpsClient:
             self._sleep(interval - elapsed)
 
     # -- fetch --------------------------------------------------------------
-    def biblio_url(self, ref: str) -> str:
-        fmt = self.settings.reference_format
+    def _biblio_url(self, fmt: str, ref: str) -> str:
         quoted = urllib.parse.quote(ref, safe="")
         return f"{self.settings.base_url}/published-data/publication/{fmt}/{quoted}/biblio"
+
+    def biblio_url(self, ref: str) -> str:  # back-compat: configured format
+        return self._biblio_url(self.settings.reference_format, ref)
+
+    def reference_candidates(self, ref: str) -> list[tuple[str, str]]:
+        """(format, number) variants to try for one input reference.
+
+        OPS is picky about number format — US grants usually want docdb
+        (``US.10041971.B2``) while EP works in epodoc — so we parse the input into
+        country / number / kind and try the sensible encodings in order, stopping
+        at the first that isn't a 404. Unparseable input falls back to the
+        configured format verbatim.
+        """
+        s = ref.strip().upper().replace(" ", "").replace(",", "")
+        m = re.match(r"^([A-Z]{2})([0-9]+)([A-Z][0-9]?)?$", s)
+        if not m:
+            return [(self.settings.reference_format, s)]
+        cc, num, kind = m.group(1), m.group(2), m.group(3)
+        cands: list[tuple[str, str]] = []
+        if kind:
+            cands.append(("epodoc", f"{cc}{num}{kind}"))
+            cands.append(("docdb", f"{cc}.{num}.{kind}"))
+        cands.append(("epodoc", f"{cc}{num}"))
+        cands.append(("docdb", f"{cc}.{num}"))
+        seen: set[tuple[str, str]] = set()
+        return [c for c in cands if not (c in seen or seen.add(c))]
 
     def _get(self, url: str, token: str) -> HttpResponse:
         self._throttle()
@@ -152,17 +178,26 @@ class OpsClient:
     def fetch_biblio(self, ref: str) -> RawRecord:
         """Fetch one publication's biblio data as a RawRecord.
 
+        Tries the format variants from ``reference_candidates`` until one resolves
+        (a 404 falls through to the next; throttling/other errors propagate).
         Retries once after re-authentication on a 401 (expired/revoked token).
         """
-        url = self.biblio_url(ref)
-        body, content_type = self.fetch(url, ref=ref)
-        return RawRecord(
-            ref=ref,
-            locator=url,
-            payload=body,
-            content_type=content_type,
-            retrieved_at=datetime.now(timezone.utc),
-        )
+        last_not_found: OpsNotFound | None = None
+        for fmt, candidate in self.reference_candidates(ref):
+            url = self._biblio_url(fmt, candidate)
+            try:
+                body, content_type = self.fetch(url, ref=ref)
+            except OpsNotFound as exc:
+                last_not_found = exc
+                continue
+            return RawRecord(
+                ref=ref,
+                locator=url,
+                payload=body,
+                content_type=content_type,
+                retrieved_at=datetime.now(timezone.utc),
+            )
+        raise last_not_found or OpsNotFound(f"not found: {ref!r}")
 
     def fetch(self, url: str, *, ref: str = "") -> tuple[bytes, str]:
         """Authenticated GET of an OPS URL → (body, content-type).

@@ -68,6 +68,20 @@ def test_404_maps_to_not_found():
         make_client(transport).fetch_biblio("EP0000000")
 
 
+def test_us_number_falls_back_to_docdb_after_epodoc_404():
+    # epodoc variants 404; the docdb form (US.10041971.B2) resolves.
+    transport = FakeTransport(
+        [
+            (AUTH, token_response()),
+            (("GET", "docdb/US.10041971.B2/biblio"), xml_response("ops_biblio_single.xml")),
+            (("GET", "/biblio"), HttpResponse(404, {}, b"")),  # any other format 404s
+        ]
+    )
+    raw = make_client(transport).fetch_biblio("US10041971B2")
+    assert "docdb/US.10041971.B2/biblio" in raw.locator
+    assert raw.ref == "US10041971B2"
+
+
 def test_403_quota_maps_to_throttled():
     resp = HttpResponse(403, {"X-Rejection-Reason": "IndividualQuotaPerHour"}, b"")
     transport = FakeTransport([(AUTH, token_response()), (("GET", "/biblio"), resp)])
