@@ -89,6 +89,11 @@ class S1FundingStream:
         combined = " ".join(q.query for q in queries)
         search = self.client.search_funding(combined, years=years)
 
+        # The provenance reflects the client: licensed Dealroom, or the synthetic
+        # mock used by default (licence separation, rule 5).
+        source_type = getattr(self.client, "source_type", SOURCE_TYPE)
+        licence = getattr(self.client, "licence", Licence.licensed_dealroom)
+
         money_m = search.total_amount_eur / 1e6
         funding_ev = EvidenceRecord(
             stream=STREAM,
@@ -97,9 +102,7 @@ class S1FundingStream:
                 f"€{money_m:.1f}M total funding across {search.round_count} rounds "
                 f"({years[0]}-{years[-1]})"
             ),
-            source=SourceSpec(
-                SOURCE_TYPE, Licence.licensed_dealroom, f"dealroom:funding:{combined}"
-            ),
+            source=SourceSpec(source_type, licence, f"{source_type}:funding:{combined}"),
         )
         result.sub_signals.append(
             SubSignal(
@@ -117,7 +120,7 @@ class S1FundingStream:
                 match_strength=1.0,
                 snippet="Active investors: " + ", ".join(investors),
                 source=SourceSpec(
-                    SOURCE_TYPE, Licence.licensed_dealroom, f"dealroom:investors:{combined}"
+                    source_type, licence, f"{source_type}:investors:{combined}"
                 ),
             )
             result.sub_signals.append(
@@ -155,6 +158,41 @@ def parse_funding(payload: bytes | str) -> FundingSearch:
         investors=investors,
         rounds=rounds,
     )
+
+
+_MOCK_INVESTORS = (
+    "Northbridge Ventures", "Helios Capital", "EU Deep-Tech Fund", "Kepler Partners",
+    "Atlas Seed", "Meridian Growth", "Photon Ventures", "Greenfield Capital",
+)
+
+
+class MockS1Client:
+    """Default S1Client: deterministic SYNTHETIC funding data, no licence needed.
+
+    Lets the funding stream run out of the box (E5) without a Dealroom licence.
+    Output is reproducible from the query and clearly marked synthetic (its
+    evidence carries a ``synthetic`` licence and a ``mock:funding`` source), so it
+    is never mistaken for licensed raw data (rule 5). Swapping in the real
+    ``DealroomS1Client`` is a config/credential change.
+    """
+
+    source_type = "mock:funding"
+    licence = Licence.synthetic
+
+    def search_funding(self, query: str, *, years: list[int]) -> FundingSearch:
+        import hashlib
+
+        h = int(hashlib.sha256(query.strip().lower().encode()).hexdigest(), 16)
+        total = float((h % 45 + 1) * 1_000_000)  # €1M–45M
+        rounds = h % 6 + 1
+        n_inv = h % 4  # 0–3 investors
+        investors = [_MOCK_INVESTORS[(h >> (i * 5)) % len(_MOCK_INVESTORS)] for i in range(n_inv)]
+        # De-duplicate while preserving order.
+        seen: list[str] = []
+        for inv in investors:
+            if inv not in seen:
+                seen.append(inv)
+        return FundingSearch(total_amount_eur=total, round_count=rounds, investors=seen)
 
 
 class DealroomS1Client:

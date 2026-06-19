@@ -133,7 +133,7 @@
 <div class="card">
   <h2>Cross-stream evidence <span class="muted" style="font-weight:400;font-size:12px">({{ evidence|length }} signal{{ '' if evidence|length == 1 else 's' }})</span></h2>
   {% if not evidence %}
-    <p class="muted">No cross-stream signals stored (S2/S1 need live credentials in this demo).</p>
+    <p class="muted">No cross-stream signals stored (the market queries matched nothing; S2 patents need a free EPO key — S1 funding runs on the synthetic mock by default).</p>
   {% else %}
   <table>
     <thead><tr><th>Stream</th><th>Strength</th><th>Snippet</th><th>Source (provenance)</th></tr></thead>

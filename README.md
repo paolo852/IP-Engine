@@ -404,9 +404,10 @@ system binaries for the duration of the run. Point them at an existing database
   cross-connector entity resolution is not yet implemented).
 - EPO OPS legal-status and claims/description endpoints (`legal_status` and
   `claims_or_description` are left unset by the biblio connector for now).
-- A live Dealroom-backed S1 client path (the stream + parser exist and are
-  network-isolated; live runs need a licence key) and folding S1 evidence into
-  the brief inputs.
+- S1 funding runs on a **synthetic mock by default** (deterministic, licence-
+  separated); the live Dealroom-backed client path exists and is network-isolated,
+  and activates when a licence key is set. Folding S1 evidence into the brief
+  inputs is still pending.
 - OPS forward-citation *entity* enrichment (the S2 count is live; citing-applicant
   names need a biblio follow-up per citing doc — currently fake-only).
 - A scheduler around the orchestration (the `Pipeline` runs a batch in-process via

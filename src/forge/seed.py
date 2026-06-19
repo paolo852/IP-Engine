@@ -282,6 +282,12 @@ def build_stream_clients(config_dir: str = "config"):
             s1_client = DealroomS1Client(UrllibTransport(), base_url=base_url)
         except Exception:  # noqa: BLE001 - S1 is optional/licensed
             s1_client = None
+    else:
+        # No Dealroom licence -> run S1 on the synthetic mock by default (E5), so
+        # the funding stream contributes a (clearly synthetic) signal out of the box.
+        from .streams.s1_funding import MockS1Client
+
+        s1_client = MockS1Client()
     return s2_client, s1_client
 
 
