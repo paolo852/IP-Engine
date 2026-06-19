@@ -362,14 +362,16 @@ def create_app(
             low_evidence = score is None or score.ventureability is None or (
                 score.coverage < min_coverage
             )
+            profile = get_profile(session, aid)
             ctx = {
                 "asset": asset,
                 "provenance": list(asset.provenance),
                 "dormancy": dormancy,
-                "profile": get_profile(session, aid),
+                "profile": profile,
                 "synthesis": get_synthesis(session, aid),
                 "score": score,
                 "low_evidence": low_evidence,
+                "review_reason": _review_reason(profile, low_evidence),
                 "min_coverage": min_coverage,
                 "evidence": get_evidence(session, aid),
                 "decision": latest_decision(session, aid),
@@ -472,6 +474,30 @@ def create_app(
         return RedirectResponse(url="/", status_code=303)
 
     return app
+
+
+def _review_reason(profile, low_evidence: bool) -> str | None:
+    """Why an evidence-poor asset is flagged — the same distinction the pipeline's
+    E2 re-query draws, derived here at read time: did the profiler produce market
+    queries at all, or did genuine market terms still find little signal?
+
+    The engine only routes to human review with a reason; it never decides (rule 7).
+    """
+    if not low_evidence:
+        return None
+    apps = (getattr(profile, "candidate_applications", None) or []) if profile else []
+    has_market_terms = any((a or {}).get("industry_terms") for a in apps)
+    if has_market_terms:
+        return (
+            "Market terms were generated and searched, but the streams still found "
+            "little signal — this looks like a genuinely weak market rather than a "
+            "query problem. An analyst should confirm before discarding."
+        )
+    return (
+        "The profiler produced no market/application search terms (only the asset's "
+        "technical vocabulary), so the streams searched the wrong thing. Sharpen the "
+        "candidate markets and re-run before trusting any ranking."
+    )
 
 
 class _ScoreSnapshot:

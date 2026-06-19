@@ -17,7 +17,7 @@ corroboration are returned in memory for the committee step (slice 9).
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Iterable
 
@@ -39,7 +39,7 @@ from .config import (
 )
 from .db.models import Asset
 from .dormancy import DormancyAssessment, assess_asset
-from .enrichment.profiling import AssetProfile, build_profile
+from .enrichment.profiling import AssetProfile, _dedup, build_profile
 from .llm.provider import LLMProvider
 from .output.brief import BriefInputs, MarketContextBrief, build_brief
 from .repository import (
@@ -94,6 +94,7 @@ class AssetPipelineResult:
     score: VentureabilityScore | None = None
     brief: MarketContextBrief | None = None
     synthesis: object | None = None  # forge.output.synthesis.DecisionSynthesis
+    diagnostics: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     @property
@@ -164,6 +165,14 @@ class Pipeline:
 
         if result.profile is not None:
             result.stream_results = self._run_streams(asset, result.profile, result.errors)
+            try:
+                result.diagnostics.extend(
+                    self._requery_if_thin(
+                        asset, result.profile, result.stream_results, result.errors
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001 - re-query is best-effort
+                result.errors.append(f"requery: {exc}")
             try:
                 streams_present = {r.stream for r in result.stream_results}
                 if streams_present:
@@ -252,6 +261,74 @@ class Pipeline:
                 errors.append(f"S1: {exc}")
         return results
 
+    def _requery_if_thin(
+        self,
+        asset: Asset,
+        profile: AssetProfile,
+        results: list[StreamResult],
+        errors: list[str],
+    ) -> list[str]:
+        """E2: when cross-stream coverage is below the configured floor, re-query
+        the live streams (S1/S2) with a BROADENED market-term set, keep whichever
+        run gave better coverage, then diagnose *why* coverage is thin — a
+        genuinely weak asset vs a profiler that produced poor market queries.
+
+        Returns human-readable diagnostics (also surfaced on the result) so the
+        engine logs which case it concluded and why. Mutates ``results`` in place
+        when a broadened re-query improves coverage, so the persisted evidence
+        reflects the better run. The engine never decides — this only routes the
+        asset to human review with a reason (rule 7).
+        """
+        min_cov = float(self.cfg.streams.sections.get("min_stream_coverage", 0.5))
+        cov = _stream_coverage(results)
+        # Nothing to re-query against if neither live stream is wired in.
+        if self.s1_stream is None and self.s2_stream is None:
+            return [f"stream coverage {cov:.0%}; no live stream to re-query"]
+        if cov >= min_cov:
+            return [f"stream coverage {cov:.0%} (>= {min_cov:.0%} floor; no re-query)"]
+
+        broadened = _broaden_query_terms(profile)
+        had_market_terms = any(app.industry_terms for app in profile.applications)
+
+        if not broadened or broadened == list(profile.query_terms):
+            # The profiler gave us no wider market vocabulary to try.
+            return [
+                f"stream coverage {cov:.0%} below {min_cov:.0%} floor; no broader "
+                "market terms available — profiler produced poor queries; "
+                "insufficient market evidence — human review"
+            ]
+
+        # Re-run with the broadened terms; adopt it only if coverage improved so a
+        # broader-but-noisier query never makes the evidence worse.
+        rerun = self._run_streams(asset, replace(profile, query_terms=broadened), errors)
+        new_cov = _stream_coverage(rerun)
+        if new_cov > cov:
+            results[:] = rerun
+            cov = new_cov
+
+        if cov >= min_cov:
+            return [
+                f"stream coverage rose to {cov:.0%} after broadened market re-query "
+                f"(>= {min_cov:.0%} floor)"
+            ]
+
+        # Still thin after broadening: distinguish the two failure modes.
+        if had_market_terms:
+            verdict = (
+                "genuinely weak asset — broadened market re-query still found little "
+                "signal; insufficient market evidence — human review"
+            )
+        else:
+            verdict = (
+                "profiler produced poor queries — no market industry_terms were "
+                "generated to search on; sharpen the candidate markets, then re-run"
+            )
+        return [
+            f"stream coverage {cov:.0%} still below {min_cov:.0%} floor after "
+            "broadened market re-query",
+            verdict,
+        ]
+
     # -- batch --------------------------------------------------------------
     def run(self, session: Session, asset_ids: Iterable[uuid.UUID]) -> PipelineReport:
         report = PipelineReport()
@@ -267,6 +344,41 @@ class Pipeline:
                     result = AssetPipelineResult(asset_id=asset_id, errors=[f"fatal: {exc}"])
             report.results.append(result)
         return report
+
+
+def _stream_coverage(results: list[StreamResult]) -> float:
+    """Share of the attempted streams that returned at least one evidence record.
+
+    This is the cross-stream *coverage* the re-query gate reasons over: a stream
+    that ran but found nothing counts against coverage, which is the honest signal
+    that the market queries matched little (E2) — not a fabricated half-score.
+    """
+    if not results:
+        return 0.0
+    useful = sum(1 for r in results if r.evidence())
+    return useful / len(results)
+
+
+def _broaden_query_terms(profile: AssetProfile) -> list[str]:
+    """A wider MARKET-term set for a re-query (E2).
+
+    The primary queries are each application's ``industry_terms``; when those come
+    up thin we broaden to the application *market names*, their *end customers* and
+    *use cases* — still market vocabulary, deliberately NOT the patent's technical
+    jargon (which finds only the technology, never the market). The original query
+    terms are kept too, then the whole set is deduped.
+    """
+    terms: list[str] = []
+    for app in profile.applications:
+        terms.extend(app.industry_terms)
+        if app.value:
+            terms.append(app.value)
+        if app.end_customer:
+            terms.append(app.end_customer)
+        if app.use_case:
+            terms.append(app.use_case)
+    terms.extend(profile.query_terms)
+    return _dedup(terms)
 
 
 def _publication_id(asset: Asset) -> str | None:

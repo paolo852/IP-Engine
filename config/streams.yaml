@@ -1,6 +1,11 @@
 # Cross-referencing stream parameters — CONFIG, not code (rule 3).
 # Consumed by L3 cross-referencing. Built one stream at a time: S2 first (free).
 
+# If fewer than this share of the attempted streams return usable evidence, the
+# engine re-queries S1/S2 with a BROADENED market-term set before deciding the
+# coverage is genuinely low (E2). CONFIG, not code.
+min_stream_coverage: 0.5
+
 s2_patents:
   # Years of filing history used to estimate the field's filing-trend slope.
   filing_window_years: 5

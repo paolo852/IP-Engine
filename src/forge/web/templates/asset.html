@@ -39,9 +39,11 @@
   <strong>⚠ Insufficient market evidence — provisional, needs human review.</strong>
   The cross-referencing found little or no signal
   {% if score %}(coverage {{ "%.0f"|format(score.coverage * 100) }}%, below the {{ "%.0f"|format(min_coverage * 100) }}% floor){% endif %},
-  so this is <em>not</em> a reliable score. This usually means the search ran on the
-  asset's <em>technical</em> vocabulary rather than <em>market/application</em> terms —
-  an analyst should sharpen the candidate markets before trusting any ranking.
+  so this is <em>not</em> a reliable score.
+  {% if review_reason %}<br>{{ review_reason }}{% else %}
+  This usually means the search ran on the asset's <em>technical</em> vocabulary
+  rather than <em>market/application</em> terms — an analyst should sharpen the
+  candidate markets before trusting any ranking.{% endif %}
 </div>
 {% endif %}
 
