@@ -281,6 +281,10 @@ class AssetProfile(Base):
     solution: Mapped[str] = mapped_column(Text, nullable=False)
     applications: Mapped[list] = mapped_column(JSONB, nullable=False)
     query_terms: Mapped[list] = mapped_column(JSONB, nullable=False)
+    technology_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # [{application, end_customer, use_case, industry_terms}] — the structured
+    # market decomposition (E1). The market reading that drives the streams.
+    candidate_applications: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     model: Mapped[str] = mapped_column(String(128), nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

@@ -100,11 +100,17 @@ class OfflineProfilingProvider:
         )
         app_quote = title or problem_quote
 
+        terms = _keywords(f"{title} {abstract}")
         payload = {
+            "technology_summary": title,
             "problem": {"value": problem_quote, "quote": problem_quote},
             "solution": {"value": solution_quote, "quote": solution_quote},
-            "applications": [{"value": app_quote, "quote": app_quote}],
-            "query_terms": _keywords(f"{title} {abstract}"),
+            # Offline can't invent markets, so the single application reuses the
+            # asset's own terms as industry_terms (degraded placeholder, honest).
+            "applications": [
+                {"value": app_quote, "quote": app_quote, "industry_terms": terms}
+            ],
+            "query_terms": terms,
         }
         return LLMResponse(text=json.dumps(payload), model=self.model)
 

@@ -185,6 +185,16 @@ def save_profile(session: Session, asset: Asset, profile) -> AssetProfile:
         solution=profile.solution.value,
         applications=[a.value for a in profile.applications],
         query_terms=list(profile.query_terms),
+        technology_summary=getattr(profile, "technology_summary", "") or None,
+        candidate_applications=[
+            {
+                "application": a.value,
+                "end_customer": a.end_customer,
+                "use_case": a.use_case,
+                "industry_terms": list(a.industry_terms),
+            }
+            for a in profile.applications
+        ],
         model=profile.model,
         prompt_version=profile.prompt_version,
     )

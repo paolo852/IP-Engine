@@ -301,7 +301,7 @@ Five layers + cross-cutting governance:
 | `source` | Where data came from; carries a licence class + raw-data pointer. |
 | `field_provenance` | Links each populated factual asset field to ≥1 source. |
 | `evidence` | Normalised, derived cross-stream signal (S1–S4), kept separate from raw. |
-| `asset_profile` | LLM-derived `{problem, solution, applications}` profile (internal-licence source). |
+| `asset_profile` | LLM-derived profile (internal-licence source): problem/solution plus the **market decomposition** — `technology_summary` and `candidate_applications[]{application, end_customer, use_case, industry_terms}` whose industry terms drive the S1/S2 queries. |
 | `profile_grounding` | The verbatim quote + asset field grounding each profile statement. |
 | `asset_score` | The latest persisted ventureability score (value, coverage, routing, per-dimension breakdown) — one row per asset, replaced on re-score. |
 | `asset_synthesis` | The decision-oriented reading shown first (LLM recommendation, market summary, open questions) — derived from the engine's signals, advisory not a claim. One row per asset; absent without a capable LLM. |

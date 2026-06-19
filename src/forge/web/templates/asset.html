@@ -97,6 +97,23 @@
     <span class="muted" style="font-weight:400;font-size:12px">(internal: the problem/solution and market hypotheses used to drive the streams; model {{ profile.model }})</span>
   </summary>
   <p class="src" style="margin:8px 0 4px">This is the engine's <em>input</em>, not the committee's answer: it reframes the asset to generate market queries. What matters for a decision is the evidence and routing above — not this paraphrase.</p>
+  {% if profile.technology_summary %}<p><strong>Technology.</strong> {{ profile.technology_summary }}</p>{% endif %}
+  {% if profile.candidate_applications %}
+  <p style="font-weight:600;margin:8px 0 2px">Candidate markets (application decomposition)</p>
+  <table>
+    <thead><tr><th>Market</th><th>End customer</th><th>Use case</th><th>Industry search terms</th></tr></thead>
+    <tbody>
+      {% for a in profile.candidate_applications %}
+      <tr>
+        <td>{{ a.application }}</td>
+        <td class="muted">{{ a.end_customer or "—" }}</td>
+        <td class="muted">{{ a.use_case or "—" }}</td>
+        <td class="src">{{ (a.industry_terms or []) | join(", ") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
   {% set quotes = {} %}
   {% for g in profile.grounding %}{% if quotes.update({g.field_name: g}) %}{% endif %}{% endfor %}
   <p><strong>Problem.</strong> {{ profile.problem }}</p>

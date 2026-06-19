@@ -40,12 +40,29 @@ _GROUNDED_ITEM = {
     "additionalProperties": False,
 }
 
+# A candidate market application: still grounded by a verbatim quote of the
+# technical basis, but described in INDUSTRY terms (end customer + use case) with
+# the industry search phrases that drive the funding/citation streams.
+_APPLICATION_ITEM = {
+    "type": "object",
+    "properties": {
+        "value": {"type": "string"},
+        "quote": {"type": "string"},
+        "end_customer": {"type": "string"},
+        "use_case": {"type": "string"},
+        "industry_terms": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["value", "quote"],
+    "additionalProperties": False,
+}
+
 PROFILE_JSON_SCHEMA = {
     "type": "object",
     "properties": {
+        "technology_summary": {"type": "string"},
         "problem": _GROUNDED_ITEM,
         "solution": _GROUNDED_ITEM,
-        "applications": {"type": "array", "items": _GROUNDED_ITEM},
+        "applications": {"type": "array", "items": _APPLICATION_ITEM},
         "query_terms": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["problem", "solution", "applications", "query_terms"],
@@ -60,15 +77,17 @@ SYSTEM_PROMPT = (
     " - PROBLEM: the underlying need in problem-space terms (what does the world "
     "lack), not the patent's wording.\n"
     " - SOLUTION: what the asset does, plainly.\n"
-    " - APPLICATIONS: concrete CANDIDATE MARKETS, each named in INDUSTRY language — "
-    "who would buy it and for what use (e.g. 'quality control in semiconductor "
-    "fabs', 'materials characterisation for battery makers', 'single-cell "
-    "biomedical imaging'), NOT the invention's technical vocabulary. These are "
-    "hypotheses the engine will test against funding and patent signals.\n"
-    " - QUERY_TERMS: short search phrases in MARKET / APPLICATION / CUSTOMER terms "
-    "(industries, use cases, buyer types) for finding related funding rounds, "
-    "competitor patents, and standards. Do NOT use the patent's technical jargon "
-    "as query terms — that finds only the technology, not the market.\n\n"
+    " - TECHNOLOGY_SUMMARY: one neutral sentence naming the core technology.\n"
+    " - APPLICATIONS: at least THREE distinct CANDIDATE MARKETS (application "
+    "decomposition). For each, give: 'value' (the market named in INDUSTRY language, "
+    "e.g. 'quality control in semiconductor fabs', 'materials characterisation for "
+    "battery makers', 'single-cell biomedical imaging' — NOT the invention's "
+    "technical vocabulary); 'end_customer' (who buys it); 'use_case' (what they do "
+    "with it); and 'industry_terms' (3-6 search phrases a buyer in that industry "
+    "would use). These are hypotheses the engine tests against funding and patents.\n"
+    " - QUERY_TERMS: a few extra market/application search phrases beyond the "
+    "per-application industry_terms. Do NOT use the patent's technical jargon — that "
+    "finds only the technology, not the market.\n\n"
     "GROUNDING (mandatory): for problem, solution, and every application you MUST "
     "include a 'quote' copied verbatim from the SOURCE (an exact substring) showing "
     "the technical basis. The 'value' may be your market interpretation, but the "
@@ -92,12 +111,20 @@ class GroundingError(ProfilingError):
 
 @dataclass
 class GroundedField:
-    """One profile statement plus the verbatim quote that grounds it."""
+    """One profile statement plus the verbatim quote that grounds it.
+
+    For applications the optional market fields carry the industry framing: the
+    end customer, the use case, and the ``industry_terms`` that become the primary
+    stream queries (E1) — these are derived search constructs, not asserted facts.
+    """
 
     name: str  # "problem" | "solution" | "application[0]" | ...
     value: str
     quote: str
     source_field: str | None = None  # which asset field the quote was found in
+    end_customer: str | None = None
+    use_case: str | None = None
+    industry_terms: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -110,6 +137,7 @@ class AssetProfile:
     query_terms: list[str]
     model: str
     prompt_version: str = PROMPT_VERSION
+    technology_summary: str = ""
 
     def grounded_fields(self) -> list[GroundedField]:
         return [self.problem, self.solution, *self.applications]
@@ -161,7 +189,18 @@ def _grounded_from(raw: object, name: str) -> GroundedField:
     value, quote = raw["value"], raw["quote"]
     if not isinstance(value, str) or not isinstance(quote, str):
         raise ProfilingError(f"profile field {name!r} value/quote must be strings")
-    return GroundedField(name=name, value=value, quote=quote)
+    terms = raw.get("industry_terms", [])
+    industry_terms = [t for t in terms if isinstance(t, str) and t.strip()] if isinstance(terms, list) else []
+    end_customer = raw.get("end_customer") if isinstance(raw.get("end_customer"), str) else None
+    use_case = raw.get("use_case") if isinstance(raw.get("use_case"), str) else None
+    return GroundedField(
+        name=name,
+        value=value,
+        quote=quote,
+        end_customer=end_customer,
+        use_case=use_case,
+        industry_terms=industry_terms,
+    )
 
 
 def build_profile(
@@ -201,17 +240,37 @@ def build_profile(
     if not isinstance(raw_terms, list) or not all(isinstance(t, str) for t in raw_terms):
         raise ProfilingError("'query_terms' must be a list of strings")
 
+    # The PRIMARY stream queries are the applications' industry terms (E1): the
+    # market vocabulary, not the patent's. Fall back to model query_terms only
+    # when no application supplied industry terms.
+    query_terms = _dedup(
+        [t for app in applications for t in app.industry_terms] + list(raw_terms)
+    )
+
+    summary = payload.get("technology_summary", "")
     profile = AssetProfile(
         problem=problem,
         solution=solution,
         applications=applications,
-        query_terms=list(raw_terms),
+        query_terms=query_terms,
         model=response.model,
+        technology_summary=summary if isinstance(summary, str) else "",
     )
 
     if verify:
         verify_grounding(profile, sources)
     return profile
+
+
+def _dedup(terms: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in terms:
+        key = t.strip().lower()
+        if t.strip() and key not in seen:
+            seen.add(key)
+            out.append(t.strip())
+    return out
 
 
 def verify_grounding(profile: AssetProfile, sources: dict[str, str]) -> None:
