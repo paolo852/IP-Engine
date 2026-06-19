@@ -24,6 +24,7 @@ from ..db.models import Licence
 from ..enrichment.profiling import AssetProfile
 from .analysis import clamp_unit, coverage, linear_slope
 from .base import EvidenceRecord, SourceSpec, StreamResult, SubSignal
+from .entities import CORPORATE, classify_entity, markers_from_config
 
 STREAM = "S2_patents"
 SOURCE_TYPE = "epo_ops"
@@ -88,6 +89,7 @@ class S2PatentsStream:
         self.client = client
         self.window = int(config.get("filing_window_years", 5))
         self.max_neighbours = int(config.get("max_neighbours", 10))
+        self._academic_markers, self._corporate_markers = markers_from_config(config)
 
     def queries(self, profile: AssetProfile) -> list[PatentQuery]:
         return [PatentQuery(term=t, cql=_to_cql(t)) for t in profile.query_terms if t.strip()]
@@ -112,8 +114,16 @@ class S2PatentsStream:
         if publication_id:
             citing = self.client.forward_citations(publication_id)
             result.sub_signals.append(self._forward_citation_signal(publication_id, citing))
+            result.sub_signals.append(self._corporate_citation_signal(citing))
 
         return result
+
+    def _classify(self, entity: str | None) -> str:
+        return classify_entity(
+            entity,
+            academic_markers=self._academic_markers,
+            corporate_markers=self._corporate_markers,
+        )
 
     # -- sub-signal builders -------------------------------------------------
     def _neighbour_signal(self, search: SearchResult) -> SubSignal:
@@ -166,17 +176,36 @@ class S2PatentsStream:
                 stream=STREAM,
                 match_strength=1.0,  # a direct citation of THIS asset is maximally relevant
                 snippet=f"{c.publication_id} cites {publication_id}"
-                + (f" (applicant: {c.entity})" if c.entity else ""),
+                + (f" (applicant: {c.entity}, {self._classify(c.entity)})" if c.entity else ""),
                 link=_espacenet(c.publication_id),
                 source=SourceSpec(SOURCE_TYPE, Licence.free, c.publication_id),
                 observed_at=_to_dt(c.date),
             )
             for c in citing
         ]
-        detail = f"{len(citing)} forward citation(s)" + (
-            f"; citing entities: {', '.join(entities)}" if entities else ""
-        )
+        kinds = [self._classify(c.entity) for c in citing if c.entity]
+        corp = kinds.count(CORPORATE)
+        acad = kinds.count("academic")
+        detail = f"{len(citing)} forward citation(s)"
+        if entities:
+            detail += f"; citing entities: {', '.join(entities)}"
+        if kinds:
+            detail += f" ({corp} corporate, {acad} academic)"
         return SubSignal("forward_citation_count", float(len(citing)), detail, evidence)
+
+    def _corporate_citation_signal(self, citing: list[CitingDoc]) -> SubSignal:
+        """Industry-adoption signal: how many citing applicants are companies.
+
+        Carried as a separate, transparently-named sub-signal (no own evidence —
+        the citations live on ``forward_citation_count``) so the scorer can weight
+        corporate adoption explicitly rather than treating all citations alike.
+        """
+        corp = [c for c in citing if self._classify(c.entity) == CORPORATE]
+        names = sorted({c.entity for c in corp if c.entity})
+        detail = f"{len(corp)} of {len(citing)} forward citation(s) from companies"
+        if names:
+            detail += f": {', '.join(names)}"
+        return SubSignal("corporate_citation_count", float(len(corp)), detail, [])
 
     def _window_years(self, as_of_year: int | None) -> list[int]:
         end = as_of_year or date.today().year
@@ -222,6 +251,59 @@ def parse_search(payload: bytes | str) -> SearchResult:
     return SearchResult(total=total, hits=hits)
 
 
+def parse_citing(payload: bytes | str) -> list[CitingDoc]:
+    """Parse an OPS biblio search response into citing docs with applicants.
+
+    The biblio search endpoint returns ``exchange-document`` entries carrying both
+    the publication reference and the parties; we pair each citing publication id
+    with its first applicant name so the entity classifier (E4) can tell corporate
+    from academic adoption. Falls back to bare references (no applicant) when the
+    response is a plain search result.
+    """
+    root = ET.fromstring(payload)
+    docs = [e for e in root.iter() if _local(e.tag) == "exchange-document"]
+    if not docs:
+        # Plain (non-biblio) search response — references only, no applicants.
+        return [CitingDoc(publication_id=hit.publication_id) for hit in parse_search(payload).hits]
+
+    citing: list[CitingDoc] = []
+    for doc in docs:
+        pub_id = _docdb_id(doc)
+        if pub_id is None:
+            continue
+        citing.append(CitingDoc(publication_id=pub_id, entity=_first_applicant(doc)))
+    return citing
+
+
+def _docdb_id(element: ET.Element) -> str | None:
+    """First docdb publication id (country+number+kind) under ``element``."""
+    for pubref in (e for e in element.iter() if _local(e.tag) == "publication-reference"):
+        docdb = next(
+            (
+                c
+                for c in pubref.iter()
+                if _local(c.tag) == "document-id" and c.get("document-id-type") == "docdb"
+            ),
+            None,
+        )
+        if docdb is None:
+            continue
+        parts = {_local(c.tag): (c.text or "").strip() for c in docdb}
+        country, number, kind = parts.get("country"), parts.get("doc-number"), parts.get("kind")
+        if country and number:
+            return f"{country}{number}{kind or ''}"
+    return None
+
+
+def _first_applicant(doc: ET.Element) -> str | None:
+    """First applicant name under an exchange-document's parties, if any."""
+    for applicant in (e for e in doc.iter() if _local(e.tag) == "applicant"):
+        name = next((c for c in applicant.iter() if _local(c.tag) == "name"), None)
+        if name is not None and (name.text or "").strip():
+            return name.text.strip()
+    return None
+
+
 class OpsS2Client:
     """S2Client backed by the live EPO OPS search API (free, network)."""
 
@@ -245,5 +327,9 @@ class OpsS2Client:
         return out
 
     def forward_citations(self, publication_id: str) -> list[CitingDoc]:
-        res = self._search(f"ct={publication_id}")
-        return [CitingDoc(publication_id=hit.publication_id) for hit in res.hits]
+        # The biblio endpoint returns applicants too, so citing entities can be
+        # classified corporate vs academic (E4).
+        cql = f"ct={publication_id}"
+        url = f"{self._base}/published-data/search/biblio?q={urllib.parse.quote(cql)}"
+        body, _content_type = self._ops.fetch(url, ref=cql)
+        return parse_citing(body)

@@ -95,6 +95,29 @@ def test_weights_are_config_driven():
     assert score_ventureability(full_inputs(), skewed).value < base
 
 
+def test_corporate_citations_strengthen_ip_defensibility():
+    # Same citation count, but adding a corporate-adoption signal raises the
+    # ip_defensibility score (corporate citations count double, by design).
+    base_inputs = ScoringInputs(
+        asset=asset(),
+        stream_results=[sr("S2_patents", sub("forward_citation_count", 2.0, [ev("S2_patents", "EP9 cites EPX")]))],
+    )
+    corp_inputs = ScoringInputs(
+        asset=asset(),
+        stream_results=[
+            sr(
+                "S2_patents",
+                sub("forward_citation_count", 2.0, [ev("S2_patents", "EP9 cites EPX")]),
+                sub("corporate_citation_count", 2.0),
+            )
+        ],
+    )
+    base = score_ventureability(base_inputs, CONFIG).dimension("ip_defensibility")
+    boosted = score_ventureability(corp_inputs, CONFIG).dimension("ip_defensibility")
+    assert boosted.value > base.value
+    assert "2 corporate" in boosted.rationale
+
+
 def test_scaling_is_config_driven():
     lenient = ScoringConfig(weights=CONFIG.weights, scaling={**CONFIG.scaling, "citation_saturation": 1})
     strict = ScoringConfig(weights=CONFIG.weights, scaling={**CONFIG.scaling, "citation_saturation": 50})

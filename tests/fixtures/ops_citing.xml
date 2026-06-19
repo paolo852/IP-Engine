@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ops:world-patent-data xmlns:ops="http://ops.epo.org" xmlns="http://www.epo.org/exchange">
+  <ops:biblio-search total-result-count="2">
+    <ops:query syntax="CQL">ct=EP1234567A1</ops:query>
+    <ops:search-result>
+      <exchange-documents>
+        <exchange-document system="ops.epo.org" family-id="33333333">
+          <bibliographic-data>
+            <publication-reference>
+              <document-id document-id-type="docdb">
+                <country>EP</country><doc-number>9990001</doc-number><kind>A1</kind>
+              </document-id>
+            </publication-reference>
+            <parties>
+              <applicants>
+                <applicant data-format="epodoc" sequence="1">
+                  <applicant-name><name>ACME PHOTONICS GMBH</name></applicant-name>
+                </applicant>
+              </applicants>
+            </parties>
+          </bibliographic-data>
+        </exchange-document>
+        <exchange-document system="ops.epo.org" family-id="44444444">
+          <bibliographic-data>
+            <publication-reference>
+              <document-id document-id-type="docdb">
+                <country>EP</country><doc-number>9990002</doc-number><kind>B1</kind>
+              </document-id>
+            </publication-reference>
+            <parties>
+              <applicants>
+                <applicant data-format="epodoc" sequence="1">
+                  <applicant-name><name>STANFORD UNIVERSITY</name></applicant-name>
+                </applicant>
+              </applicants>
+            </parties>
+          </bibliographic-data>
+        </exchange-document>
+      </exchange-documents>
+    </ops:search-result>
+  </ops:biblio-search>
+</ops:world-patent-data>

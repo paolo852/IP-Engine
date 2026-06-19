@@ -12,6 +12,22 @@ s2_patents:
   # Cap on neighbouring patents turned into evidence records per run (politeness
   # + signal-to-noise; the density count itself is uncapped).
   max_neighbours: 10
+  # Citing-entity classification (E4): bucket each citing applicant into
+  # corporate / academic / other to tell *industry* adoption from academic
+  # lineage. CONFIG, not code — extend the marker lists without touching code.
+  # Matching is case-insensitive and word-boundary safe. Omit to use the
+  # built-in defaults (see streams/entities.py).
+  entity_classification:
+    academic_markers:
+      [university, università, universität, universite, universidad, institute,
+       institut, college, école, ecole, polytechnic, politecnico, academy,
+       accademia, fraunhofer, "max planck", cnrs, csic, "research council",
+       "research centre", "research center", "national laboratory", hospital,
+       klinik]
+    corporate_markers:
+      [inc, ltd, limited, gmbh, llc, corp, corporation, co, ag, sa, spa, srl,
+       bv, oy, ab, plc, kk, kabushiki, pty, company, technologies, systems,
+       electronics, semiconductor, pharmaceuticals, industries, holdings]
 
 s3_roadmaps:
   # Curated, indexed corpus of roadmaps / standards / regulations (public data).

@@ -94,6 +94,35 @@ def test_no_query_terms_skips_field_signals_but_keeps_citations():
     assert result.signal("forward_citation_count").value == 2.0
 
 
+def test_citing_entities_are_classified_corporate_vs_academic():
+    client = make_client(
+        citing=[
+            CitingDoc("EP999A1", entity="Acme Corp"),          # corporate
+            CitingDoc("EP998A1", entity="Stanford University"),  # academic
+            CitingDoc("EP997A1"),                                # unknown applicant
+        ]
+    )
+    result = stream(client).run(profile(["x"]), publication_id="EP9999999A1", as_of_year=2023)
+
+    corp = result.signal("corporate_citation_count")
+    assert corp is not None and corp.value == 1.0           # only Acme Corp
+    assert "Acme Corp" in corp.detail
+    assert "1 corporate, 1 academic" in result.signal("forward_citation_count").detail
+    # the per-citation evidence is annotated with the classified kind
+    fwd_evidence = [e for e in result.evidence() if "cites EP9999999A1" in e.snippet]
+    assert any("corporate" in e.snippet for e in fwd_evidence)
+    assert any("academic" in e.snippet for e in fwd_evidence)
+
+
+def test_corporate_signal_carries_no_extra_evidence():
+    # The corporate count is a derived aggregate; its evidence is the citations
+    # already on forward_citation_count, so it must not duplicate evidence rows.
+    result = stream(make_client()).run(
+        profile(["x"]), publication_id="EP9999999A1", as_of_year=2023
+    )
+    assert result.signal("corporate_citation_count").evidence == []
+
+
 def test_neighbour_density_counts_total_not_sample():
     client = make_client(
         search=SearchResult(total=137, hits=[SearchHit("EP1A1"), SearchHit("EP2A1")])

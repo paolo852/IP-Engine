@@ -155,12 +155,17 @@ def _market_pull(inp: ScoringInputs, sc: dict) -> DimensionScore:
 def _ip_defensibility(inp: ScoringInputs, sc: dict) -> DimensionScore:
     r = inp.stream_results
     cites = _signal(r, "forward_citation_count")
+    corp = _signal(r, "corporate_citation_count")
     density = _signal(r, "neighbour_density")
     legal = inp.asset.legal_status
 
     components: list[tuple[float, float]] = []
     if cites is not None:
-        components.append((0.4, _saturating(cites, sc["citation_saturation"])))
+        # A forward citation shows the field noticed the asset; a CORPORATE
+        # citation shows *industry* (not just academia) noticed it — a stronger
+        # adoption/defensibility signal, so corporate citations count double (E4).
+        effective = cites + (corp or 0.0)
+        components.append((0.4, _saturating(effective, sc["citation_saturation"])))
     if density is not None:
         components.append((0.4, 1.0 - clamp_unit(density / sc["neighbour_crowded"])))
     if legal:
@@ -177,7 +182,8 @@ def _ip_defensibility(inp: ScoringInputs, sc: dict) -> DimensionScore:
     return DimensionScore(
         "ip_defensibility",
         clamp_unit(_blend(components)),
-        f"citations={int(cites) if cites is not None else 'n/a'}, "
+        f"citations={int(cites) if cites is not None else 'n/a'}"
+        f"{f' ({int(corp)} corporate)' if corp else ''}, "
         f"neighbours={int(density) if density is not None else 'n/a'}, legal={legal!r}",
         evidence,
     )
