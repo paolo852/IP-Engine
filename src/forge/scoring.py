@@ -156,7 +156,11 @@ def _ip_defensibility(inp: ScoringInputs, sc: dict) -> DimensionScore:
     r = inp.stream_results
     cites = _signal(r, "forward_citation_count")
     corp = _signal(r, "corporate_citation_count")
+    # Field crowdedness from the problem-space text search, falling back to the
+    # IPC class-based neighbourhood when the text queries returned nothing (E4).
     density = _signal(r, "neighbour_density")
+    if density is None:
+        density = _signal(r, "class_neighbour_density")
     legal = inp.asset.legal_status
 
     components: list[tuple[float, float]] = []
@@ -175,7 +179,11 @@ def _ip_defensibility(inp: ScoringInputs, sc: dict) -> DimensionScore:
     if not components:
         return DimensionScore("ip_defensibility", None, "no citation/neighbour/legal signal", [])
     evidence = _evidence(
-        r, {"S2_patents"}, lambda e: "cites" in e.snippet or e.snippet.startswith("Neighbouring")
+        r,
+        {"S2_patents"},
+        lambda e: "cites" in e.snippet
+        or e.snippet.startswith("Neighbouring")
+        or e.snippet.startswith("Same-class"),
     )
     if legal:
         evidence.append(f"asset.legal_status='{legal}'")

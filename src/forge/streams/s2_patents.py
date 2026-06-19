@@ -77,6 +77,38 @@ def _to_cql(term: str) -> str:
     return f'txt="{escaped}"'
 
 
+def _ipc_subclass(code: str) -> str | None:
+    """The IPC subclass symbol (e.g. 'H04B') from a full IPC code.
+
+    OPS IPC text comes spaced ('H04B  10/00'); the 4-character subclass (one
+    letter, two digits, one letter) is the granularity that defines 'the field'
+    without being so specific it returns only the asset itself.
+    """
+    import re
+
+    compact = re.sub(r"\s+", "", code or "").upper()
+    return compact[:4] if len(compact) >= 4 else None
+
+
+def _dedup(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+def _class_cql(codes: list[str]) -> str | None:
+    """A CQL clause matching any of the asset's IPC subclasses, e.g.
+    ``ic=H04B or ic=G02B``. Returns None when no usable code is present."""
+    subclasses = _dedup([s for c in codes if (s := _ipc_subclass(c))])
+    if not subclasses:
+        return None
+    return " or ".join(f"ic={s}" for s in subclasses)
+
+
 def _espacenet(publication_id: str) -> str:
     q = urllib.parse.quote(f"pn={publication_id}")
     return f"https://worldwide.espacenet.com/patent/search?q={q}"
@@ -100,6 +132,7 @@ class S2PatentsStream:
         *,
         publication_id: str | None = None,
         as_of_year: int | None = None,
+        class_codes: list[str] | None = None,
     ) -> StreamResult:
         result = StreamResult(stream=STREAM)
 
@@ -110,6 +143,15 @@ class S2PatentsStream:
             years = self._window_years(as_of_year)
             counts = self.client.filings_by_year(combined, years)
             result.sub_signals.append(self._filing_trend_signal(counts))
+
+        # A class-based neighbourhood (IPC/CPC) is a language-independent measure of
+        # how crowded the field is — robust when the problem-space text queries are
+        # thin or off (complements, never replaces, the text neighbour search).
+        class_cql = _class_cql(class_codes or [])
+        if class_cql:
+            result.sub_signals.append(
+                self._class_neighbour_signal(class_codes or [], self.client.search(class_cql))
+            )
 
         if publication_id:
             citing = self.client.forward_citations(publication_id)
@@ -143,6 +185,28 @@ class S2PatentsStream:
             name="neighbour_density",
             value=float(search.total),
             detail=f"{search.total} patents in the problem space "
+            f"({len(sample)} sampled as evidence)",
+            evidence=evidence,
+        )
+
+    def _class_neighbour_signal(self, codes: list[str], search: SearchResult) -> SubSignal:
+        subclasses = _dedup([s for c in codes if (s := _ipc_subclass(c))])
+        label = ", ".join(subclasses)
+        sample = search.hits[: self.max_neighbours]
+        evidence = [
+            EvidenceRecord(
+                stream=STREAM,
+                match_strength=clamp_unit(hit.relevance),
+                snippet=f"Same-class patent {hit.publication_id} (IPC {label})",
+                link=_espacenet(hit.publication_id),
+                source=SourceSpec(SOURCE_TYPE, Licence.free, hit.publication_id),
+            )
+            for hit in sample
+        ]
+        return SubSignal(
+            name="class_neighbour_density",
+            value=float(search.total),
+            detail=f"{search.total} patents in IPC class(es) {label} "
             f"({len(sample)} sampled as evidence)",
             evidence=evidence,
         )

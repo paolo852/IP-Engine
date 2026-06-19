@@ -245,7 +245,12 @@ class Pipeline:
         if self.s2_stream is not None:
             try:
                 results.append(
-                    self.s2_stream.run(profile, publication_id=publication_id, as_of_year=year)
+                    self.s2_stream.run(
+                        profile,
+                        publication_id=publication_id,
+                        as_of_year=year,
+                        class_codes=getattr(asset, "classification_codes", None),
+                    )
                 )
             except Exception as exc:  # noqa: BLE001 - a failing source must not block others
                 errors.append(f"S2: {exc}")

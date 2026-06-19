@@ -118,6 +118,24 @@ def test_corporate_citations_strengthen_ip_defensibility():
     assert "2 corporate" in boosted.rationale
 
 
+def test_class_density_is_a_fallback_for_neighbour_density():
+    # No text-based neighbour_density, but a class-based one — ip_defensibility
+    # still gets its crowdedness component from the IPC neighbourhood (E4).
+    inputs = ScoringInputs(
+        asset=asset(),
+        stream_results=[
+            sr(
+                "S2_patents",
+                sub("forward_citation_count", 2.0, [ev("S2_patents", "EP9 cites EPX")]),
+                sub("class_neighbour_density", 40.0, [ev("S2_patents", "Same-class patent EP1 (IPC G02B)")]),
+            )
+        ],
+    )
+    dim = score_ventureability(inputs, CONFIG).dimension("ip_defensibility")
+    assert "neighbours=40" in dim.rationale
+    assert any("Same-class" in e for e in dim.evidence)
+
+
 def test_scaling_is_config_driven():
     lenient = ScoringConfig(weights=CONFIG.weights, scaling={**CONFIG.scaling, "citation_saturation": 1})
     strict = ScoringConfig(weights=CONFIG.weights, scaling={**CONFIG.scaling, "citation_saturation": 50})

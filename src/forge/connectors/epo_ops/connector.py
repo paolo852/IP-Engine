@@ -68,6 +68,7 @@ class EpoOpsConnector(Connector):
             fee_status=None,
             encumbrances=None,
             linked_publications=None,
+            classification_codes=p.ipc_classes or None,
         )
 
         # Ground every factual field that actually got a value, all from this

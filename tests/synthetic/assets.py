@@ -52,6 +52,7 @@ def synthetic_patent_bundle() -> AssetBundle:
         fee_status="lapsing",
         encumbrances="none recorded",
         linked_publications=["doi:10.0000/synthetic.2020.0001"],
+        classification_codes=["G02B 6/12", "H04B 10/00"],
     )
 
     # One provenance entry per populated factual field — all from the same
@@ -68,6 +69,7 @@ def synthetic_patent_bundle() -> AssetBundle:
         "fee_status",
         "encumbrances",
         "linked_publications",
+        "classification_codes",
     ]
     provenance = [
         ProvenanceEntry(field_name=f, source=src, note="synthetic fixture")

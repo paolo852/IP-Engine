@@ -86,6 +86,7 @@ GROUNDABLE_FIELDS: tuple[str, ...] = (
     "fee_status",
     "encumbrances",
     "linked_publications",
+    "classification_codes",
 )
 
 
@@ -152,6 +153,10 @@ class Asset(Base):
     fee_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
     encumbrances: Mapped[str | None] = mapped_column(Text, nullable=True)
     linked_publications: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Patent classification symbols (IPC/CPC), e.g. ["G02B 6/12", "H04B 10/00"].
+    # A language-independent definition of the asset's field, used by S2 to size
+    # the technical neighbourhood by class as well as by problem-space text.
+    classification_codes: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False

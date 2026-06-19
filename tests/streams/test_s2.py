@@ -8,6 +8,8 @@ from forge.streams.s2_patents import (
     SearchHit,
     SearchResult,
     YearCount,
+    _class_cql,
+    _ipc_subclass,
 )
 
 from .fakes import FakeS2Client, profile
@@ -121,6 +123,37 @@ def test_corporate_signal_carries_no_extra_evidence():
         profile(["x"]), publication_id="EP9999999A1", as_of_year=2023
     )
     assert result.signal("corporate_citation_count").evidence == []
+
+
+def test_ipc_subclass_and_class_cql_normalise_codes():
+    assert _ipc_subclass("G02B   6/12       20060101AFI") == "G02B"
+    assert _ipc_subclass("H04B10/00") == "H04B"
+    assert _ipc_subclass("xx") is None
+    # distinct subclasses, deduped, OR-joined; unusable input yields nothing
+    assert _class_cql(["G02B 6/12", "G02B 1/00", "H04B 10/00"]) == "ic=G02B or ic=H04B"
+    assert _class_cql([]) is None
+    assert _class_cql(["zz"]) is None
+
+
+def test_class_codes_drive_an_ipc_neighbour_signal():
+    client = make_client()
+    result = stream(client).run(
+        profile(["x"]),
+        publication_id="EP9999999A1",
+        as_of_year=2023,
+        class_codes=["G02B   6/12   20060101AFI", "H04B 10/00"],
+    )
+    cls = result.signal("class_neighbour_density")
+    assert cls is not None and cls.value == 42.0
+    assert "G02B" in cls.detail and "H04B" in cls.detail
+    assert cls.evidence and all(e.snippet.startswith("Same-class") for e in cls.evidence)
+    # an IPC class query was actually issued to the client
+    assert any(c[0] == "search" and "ic=G02B" in c[1] for c in client.calls)
+
+
+def test_no_class_codes_skips_the_class_signal():
+    result = stream(make_client()).run(profile(["x"]), as_of_year=2023)
+    assert result.signal("class_neighbour_density") is None
 
 
 def test_neighbour_density_counts_total_not_sample():

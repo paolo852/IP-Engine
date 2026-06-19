@@ -29,6 +29,7 @@ def test_run_normalises_grounds_and_persists(session):
     assert asset.inventors == ["ROSSI ALESSANDRO", "BIANCHI BEATRICE"]
     assert asset.key_dates["priority_date"] == "2018-07-04"
     assert asset.source_layer == "L1.epo_ops"
+    assert asset.classification_codes and asset.classification_codes[0].startswith("G02B")
 
     # Grounding: every populated factual field carries OPS provenance (rule 1),
     # and the source is the free/public class (licence separation, rule 5).
