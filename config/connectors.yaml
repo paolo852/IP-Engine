@@ -13,3 +13,11 @@ epo_ops:
   min_request_interval_seconds: 1.0
   # L2 source_layer tag stamped on assets from this connector.
   source_layer: "L1.epo_ops"
+
+cordis:
+  # CORDIS — EU research-results portal (public open data, CC BY). Project
+  # results / Key Exploitable Results are ingested as `project_result` assets.
+  # No credentials: the data is public.
+  base_url: "https://cordis.europa.eu/api/search/results"
+  request_timeout_seconds: 30
+  source_layer: "L1.cordis"

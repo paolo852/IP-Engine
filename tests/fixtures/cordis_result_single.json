@@ -1,0 +1,15 @@
+{
+  "id": "464190",
+  "title": "Photonic neuromorphic accelerator for edge inference (synthetic)",
+  "teaser": "A low-power photonic accelerator, a key exploitable result of a completed EU project (invented; not real CORDIS data).",
+  "description": "Key Exploitable Result: a co-packaged photonic neuromorphic accelerator reducing energy per inference for edge AI workloads. Synthetic record for testing only.",
+  "projectID": "101001234",
+  "projectAcronym": "PHOTON-EDGE",
+  "endDate": "2022-09-30",
+  "keywords": ["photonics", "neuromorphic computing", "edge AI"],
+  "organizations": [
+    {"name": "SYNTHETIC RESEARCH ORG", "role": "coordinator"},
+    {"name": "SYNTHETIC UNIVERSITY", "role": "participant"}
+  ],
+  "url": "https://cordis.europa.eu/result/rcn/464190_en.html"
+}

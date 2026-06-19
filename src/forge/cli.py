@@ -38,6 +38,7 @@ COMMAND_PERMISSIONS = {
     "db": "migrate",
     "assets": "view",
     "ingest-epo": "ingest",
+    "ingest-cordis": "ingest",
     "dormancy": "view",
     "pipeline": "run_pipeline",
     "cluster": "view",
@@ -89,6 +90,18 @@ def cmd_ingest_epo(args, session: Session) -> int:
     # The governance policy guards what may be stored (GDPR / rule 4).
     report = EpoOpsConnector(OpsClient(settings)).run(args.refs, session, policy=args.gov)
     print(f"EPO OPS ingest: {report.summary()}")
+    for f in report.failed:
+        print(f"  FAILED {f.ref} [{f.stage}]: {f.error}")
+    return 0 if report.ok else 1
+
+
+def cmd_ingest_cordis(args, session: Session) -> int:
+    from .config import load_connectors_config
+    from .connectors.cordis import CordisClient, CordisConnector, CordisSettings
+
+    settings = CordisSettings.from_config(load_connectors_config("config/connectors.yaml"))
+    report = CordisConnector(CordisClient(settings)).run(args.refs, session, policy=args.gov)
+    print(f"CORDIS ingest: {report.summary()}")
     for f in report.failed:
         print(f"  FAILED {f.ref} [{f.stage}]: {f.error}")
     return 0 if report.ok else 1
@@ -331,6 +344,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ingest-epo", help="ingest patents from EPO OPS")
     p.add_argument("refs", nargs="+")
     p.set_defaults(func=cmd_ingest_epo)
+
+    p = sub.add_parser("ingest-cordis", help="ingest EU project results from CORDIS")
+    p.add_argument("refs", nargs="+", help="CORDIS result ids or URLs")
+    p.set_defaults(func=cmd_ingest_cordis)
 
     p = sub.add_parser("dormancy", help="assess dormancy")
     _ids(p)
