@@ -14,6 +14,7 @@ Dealroom) come from the environment — never flags.
     forge decide <asset-id> sprint --by committee@org
     forge outcome <asset-id> licensed --by ops@org
     forge recalibrate --since-days 90
+    forge audit --trace
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ COMMAND_PERMISSIONS = {
     "delete": "delete_asset",
     "seed": "ingest",
     "serve": "view",
+    "audit": "view",
 }
 
 
@@ -274,6 +276,25 @@ def cmd_delete(args, session: Session) -> int:
     return 0
 
 
+def cmd_audit(args, session: Session) -> int:
+    from .output.audit import StoreAudit, audit_asset, audit_store
+
+    if getattr(args, "asset_ids", None):
+        store = StoreAudit()
+        for asset_id in (uuid.UUID(a) for a in args.asset_ids):
+            a = audit_asset(session, asset_id)
+            if a is None:
+                print(f"{asset_id}: not found", file=sys.stderr)
+                return 1
+            store.audits.append(a)
+    else:
+        store = audit_store(session)
+
+    print(store.render() if args.trace else store.summary())
+    # Non-zero on any ungrounded claim, so this works as a CI grounding gate.
+    return 0 if store.ok else 1
+
+
 def cmd_recalibrate(args, session: Session) -> int:
     from .config import load_recalibration_config, load_scoring_config
     from .recalibration import run_recalibration
@@ -350,6 +371,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("delete", help="remove an asset and all its derived data")
     p.add_argument("asset_id")
     p.set_defaults(func=cmd_delete)
+
+    p = sub.add_parser("audit", help="grounding audit: trace every stored claim to a source")
+    p.add_argument("asset_ids", nargs="*", help="asset ids (default: the whole store)")
+    p.add_argument("--trace", action="store_true", help="print the full claim→source trace")
+    p.set_defaults(func=cmd_audit)
 
     return parser
 
