@@ -33,6 +33,24 @@
 </div>
 {% endif %}
 
+<!-- two-axis routing suggestion (need × TRL) ----------------------------->
+{% if routing %}
+<div class="card" style="border-color:#c7d2fe">
+  <h2>Routing suggestion
+    <span class="muted" style="font-weight:400;font-size:12px">(need × TRL — a suggestion the committee decides, NOT the score)</span>
+  </h2>
+  {% if routing.status.value == 'ready' %}
+    <p style="font-size:17px;font-weight:700;margin:2px 0 6px">
+      → {{ routing.suggested_route.value }}
+      <span class="muted" style="font-weight:400;font-size:13px">need: {{ routing.need_axis.value }} · TRL: {{ routing.trl_axis.value }}</span>
+    </p>
+  {% else %}
+    <p style="font-size:16px;font-weight:700;margin:2px 0 6px">⏳ pending</p>
+  {% endif %}
+  <p class="src">{{ routing.rationale }}</p>
+</div>
+{% endif %}
+
 <!-- evidence-quality gate ------------------------------------------------->
 {% if low_evidence %}
 <div class="banner" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;margin-bottom:16px">
@@ -73,6 +91,46 @@
     <p class="src">Transparent weighted score (rule 2): every dimension shows its value and rationale; indeterminate dimensions are reported, never fabricated.</p>
   {% else %}
     <p class="muted">Not yet scored — run <code>forge pipeline</code> for this asset.</p>
+  {% endif %}
+</div>
+
+<!-- need matching: dual-track company lists + validation + TRL ----------->
+<div class="card">
+  <h2>Need matching
+    <span class="muted" style="font-weight:400;font-size:12px">(HYPOTHESES — never confirmed needs until a human validates, rule 4)</span>
+  </h2>
+  {% if trl %}
+    <p class="muted">Inventor TRL band: <strong>{{ trl.trl_band }}</strong> — from the inventor, not estimated (rule 5).</p>
+  {% else %}
+    <p class="muted">Inventor TRL: not provided yet — the engine only generates the micro-questionnaire (<code>forge trl-form</code>); the inventor answers.</p>
+  {% endif %}
+
+  {% if not has_matching %}
+    <p class="muted">No company hypotheses yet. Populate the graph (<code>forge graph-cordis</code>) then
+      <code>forge hypotheses {{ asset.id }} --generate</code>.</p>
+  {% else %}
+    {% for title, rows in [("Customer — firms that have the problem", customer_rows),
+                           ("Producer / licensee — firms that would make or sell it", producer_rows)] %}
+    <p style="font-weight:600;margin:12px 0 2px">{{ title }}</p>
+    {% if not rows %}<p class="muted" style="margin:0 0 4px">(none)</p>{% else %}
+    <table>
+      <thead><tr><th>Company</th><th>Graph tie</th><th>Strength</th><th>Validation</th><th>Hypothesis</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{% if r.e.related %}★ {% endif %}{{ r.e.name }}
+            {% if r.e.has_contact is not none %}<br><span class="pill">{{ 'contact on file' if r.e.has_contact else 'no contact' }}</span>{% endif %}</td>
+          <td class="src">{{ r.e.relationship_types | join(", ") or "—" }} (L{{ r.e.source_layers | join(",") }})</td>
+          <td>{{ r.e.strength }}</td>
+          <td>{% if r.validation %}<span class="pill {{ 'sprint' if r.validation == 'need_confirmed' else ('reject' if r.validation == 'need_denied' else 'watch') }}">{{ r.validation }}</span>{% else %}<span class="muted">unvalidated</span>{% endif %}</td>
+          <td class="src">{{ r.e.hypothesis }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% endfor %}
+    <p class="src">Related firms (★) rank first. A hypothesis stays a hypothesis until a human validation confirms it (rule 4); contact details stay hidden unless your role permits (rule: GDPR).</p>
   {% endif %}
 </div>
 

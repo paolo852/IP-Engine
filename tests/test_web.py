@@ -363,3 +363,62 @@ def test_dashboard_marks_low_evidence_as_review(client, session):
     home = client.get("/").text
     # The confident routing is replaced by a "review" marker for the committee.
     assert ">review<" in home
+
+
+# -- T15: need-matching view ------------------------------------------------
+def _seed_matching(session):
+    from pathlib import Path
+
+    from forge.config import load_needs_config
+    from forge.connectors.cordis.parser import parse_project
+    from forge.db.models import NeedOutcome
+    from forge.enrichment.profiling import AssetProfile, GroundedField
+    from forge.graph import build_layer0
+    from forge.matching import get_need_hypotheses, run_matching
+    from forge.repository import save_asset, save_profile
+    from forge.validation import record_need_validation, record_trl_check
+
+    from .synthetic.assets import synthetic_patent_bundle
+
+    def g(n, v, f, **e):
+        return GroundedField(name=n, value=v, quote="q", source_field=f, **e)
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    save_profile(session, asset, AssetProfile(
+        problem=g("problem", "energy", "abstract"),
+        solution=g("solution", "modulator", "claims_or_description"),
+        applications=[g("application[0]", "co-packaged optics", "abstract",
+                        end_customer="data centres", use_case="interconnect",
+                        industry_terms=["photonics"])],
+        query_terms=["photonics"], model="m", technology_summary="silicon photonics"))
+    fixture = Path(__file__).resolve().parent / "fixtures" / "cordis_project_single.json"
+    build_layer0(session, parse_project(fixture.read_bytes()))
+    session.commit()
+
+    run_matching(session, asset, cfg=load_needs_config("config/needs.yaml"))
+    hyp = get_need_hypotheses(session, asset.id)[0]
+    record_need_validation(session, asset, company_id=hyp.company_id, track=hyp.track,
+                           outcome=NeedOutcome.need_confirmed, validated_by="a")
+    record_trl_check(session, asset, trl_band="6-9", recorded_by="inv")
+    session.commit()
+    return asset
+
+
+def test_asset_detail_routing_pending_without_validations(client, seeded):
+    from forge.db.models import Asset
+
+    asset = seeded.query(Asset).filter(Asset.title.like("Low-power photonic%")).one()
+    detail = client.get(f"/asset/{asset.id}").text
+    assert "Routing suggestion" in detail
+    assert "Routing pending" in detail  # neither validation exists yet
+
+
+def test_asset_detail_shows_need_matching_and_ready_routing(client, session):
+    asset = _seed_matching(session)
+    detail = client.get(f"/asset/{asset.id}").text
+    assert "Need matching" in detail
+    assert "Aurora Photonics GmbH" in detail
+    assert "need_confirmed" in detail          # validation status surfaced
+    assert "Inventor TRL band" in detail and "6-9" in detail
+    # producer confirmed + high TRL -> licensing suggestion
+    assert "licensing" in detail

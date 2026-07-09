@@ -80,6 +80,9 @@ def create_app(
     dormancy_cfg = load_dormancy_config(f"{config_dir}/dormancy.yaml")
     org_cfg = load_organisation_config(f"{config_dir}/organisation.yaml")
     min_coverage = load_scoring_config(f"{config_dir}/scoring.yaml").min_coverage
+    from ..config import load_trl_config
+
+    trl_cfg = load_trl_config(f"{config_dir}/trl.yaml")
 
     app.state.session_factory = session_factory
     app.state.governance = gov
@@ -384,6 +387,7 @@ def create_app(
                 "can_delete": _can(principal, "delete_asset"),
                 "note": note,
             }
+            ctx.update(_matching_view(session, asset, principal, gov, trl_cfg))
             return _TEMPLATES.TemplateResponse(request, "asset.html", ctx)
         finally:
             session.close()
@@ -474,6 +478,34 @@ def create_app(
         return RedirectResponse(url="/", status_code=303)
 
     return app
+
+
+def _matching_view(session, asset, principal, gov, trl_cfg) -> dict:
+    """Assemble the need-matching section (T15): the two-axis routing SUGGESTION,
+    the dual-track company lists with per-company validation status, and the
+    inventor TRL status. Read-only — routing is computed in memory, not persisted."""
+    from ..db.models import Track
+    from ..matching import build_company_lists
+    from ..routing import compute_routing
+    from ..validation import latest_need_validation, latest_trl_check
+
+    routing = compute_routing(session, asset.id, trl_cfg=trl_cfg)
+    lists = build_company_lists(session, asset.id, principal=principal, governance=gov)
+
+    def _rows(entries, track):
+        out = []
+        for e in entries:
+            v = latest_need_validation(session, asset.id, e.company_id, track)
+            out.append({"e": e, "validation": v.outcome.value if v else None})
+        return out
+
+    return {
+        "routing": routing,
+        "customer_rows": _rows(lists.customer, Track.customer),
+        "producer_rows": _rows(lists.producer, Track.producer),
+        "trl": latest_trl_check(session, asset.id),
+        "has_matching": lists.total() > 0,
+    }
 
 
 def _review_reason(profile, low_evidence: bool) -> str | None:
