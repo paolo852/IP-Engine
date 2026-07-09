@@ -14,6 +14,7 @@ from forge.db.base import create_db_engine, make_session_factory
 from ._pg import PostgresUnavailable, start_embedded
 
 _TABLES = (
+    "asset_routing",
     "need_validation",
     "inventor_trl_check",
     "need_hypothesis",

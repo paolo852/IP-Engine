@@ -6,6 +6,7 @@ inventor, never an Engine estimate (rule 5). These records feed two-axis routing
 
 from .repository import (
     confirmed_tracks,
+    has_any_need_validation,
     latest_need_validation,
     latest_trl_check,
     record_need_validation,
@@ -17,6 +18,7 @@ __all__ = [
     "record_need_validation",
     "latest_need_validation",
     "confirmed_tracks",
+    "has_any_need_validation",
     "record_trl_check",
     "latest_trl_check",
     "build_questionnaire",

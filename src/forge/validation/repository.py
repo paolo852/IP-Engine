@@ -62,6 +62,13 @@ def latest_need_validation(
     return session.execute(stmt).scalars().first()
 
 
+def has_any_need_validation(session: Session, asset_id: uuid.UUID) -> bool:
+    """Whether ANY need validation exists for the asset (routing gate: the NEED
+    axis is only decidable once a company has responded at all)."""
+    stmt = select(NeedValidation.id).where(NeedValidation.asset_id == asset_id).limit(1)
+    return session.execute(stmt).first() is not None
+
+
 def confirmed_tracks(session: Session, asset_id: uuid.UUID) -> set[Track]:
     """Tracks with a latest ``need_confirmed`` validation (any company).
 

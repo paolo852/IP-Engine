@@ -46,6 +46,7 @@ COMMAND_PERMISSIONS = {
     "validate-need": "validate",
     "trl": "record_trl",
     "trl-form": "view_graph",
+    "route": "run_pipeline",
     "dormancy": "view",
     "pipeline": "run_pipeline",
     "cluster": "view",
@@ -253,6 +254,26 @@ def cmd_trl(args, session: Session) -> int:
     record_trl_check(session, asset, trl_band=band, evidence=evidence, recorded_by=args.by, note=args.note)
     reading = "high (~6-9)" if cfg.is_high(band) else "low (~2-4)"
     print(f"recorded inventor TRL {band} [{reading}] for {asset.title or asset.id}")
+    return 0
+
+
+def cmd_route(args, session: Session) -> int:
+    from .config import load_trl_config
+    from .repository import get_asset
+    from .routing import route_asset
+
+    asset = get_asset(session, uuid.UUID(args.asset_id))
+    if asset is None:
+        print(f"{args.asset_id}: not found", file=sys.stderr)
+        return 1
+    routing = route_asset(session, asset, trl_cfg=load_trl_config("config/trl.yaml"))
+    if routing.status.value == "pending":
+        print(f"routing: PENDING — {routing.rationale}")
+    else:
+        print(
+            f"routing: {routing.suggested_route.value.upper()} "
+            f"(need={routing.need_axis.value}, trl={routing.trl_axis.value}) — SUGGESTION; committee decides"
+        )
     return 0
 
 
@@ -527,6 +548,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--by", default="analyst")
     p.add_argument("--note", default=None)
     p.set_defaults(func=cmd_validate_need)
+
+    p = sub.add_parser("route", help="compute the two-axis routing suggestion (need x TRL)")
+    p.add_argument("asset_id")
+    p.set_defaults(func=cmd_route)
 
     p = sub.add_parser("trl", help="record the inventor's TRL band for an asset")
     p.add_argument("asset_id")

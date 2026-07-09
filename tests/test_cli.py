@@ -185,6 +185,25 @@ def test_validate_need_and_trl_cli(session, capsys):
     assert main(["trl", str(asset.id), "9-10"]) == 1
 
 
+def test_route_cli_pending_then_ready(session, capsys):
+    from forge.db.models import NeedOutcome, Track
+    from forge.graph import resolve_company
+    from forge.validation import record_need_validation, record_trl_check
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    company, _ = resolve_company(session, name="Aurora Photonics GmbH")
+    session.commit()
+
+    assert main(["route", str(asset.id)]) == 0
+    assert "PENDING" in capsys.readouterr().out
+
+    record_need_validation(session, asset, company_id=company.id, track=Track.producer,
+                           outcome=NeedOutcome.need_confirmed, validated_by="a")
+    record_trl_check(session, asset, trl_band="6-9", recorded_by="inv")
+    assert main(["route", str(asset.id)]) == 0
+    assert "LICENSING" in capsys.readouterr().out
+
+
 def test_trl_form_prints_questionnaire(capsys):
     assert main(["trl-form"]) == 0
     out = capsys.readouterr().out

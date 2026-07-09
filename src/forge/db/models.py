@@ -718,6 +718,76 @@ class InventorTrlCheck(Base):
     asset: Mapped[Asset] = relationship()
 
 
+class RoutingStatus(str, enum.Enum):
+    """Whether both human validations exist yet for two-axis routing."""
+
+    pending = "pending"  # awaiting a need validation and/or the inventor's TRL
+    ready = "ready"
+
+
+class NeedAxis(str, enum.Enum):
+    """The resolved NEED axis (from need validations)."""
+
+    customer = "customer"
+    producer = "producer"
+    none = "none"  # no confirmed need (denied / no-response)
+
+
+class TrlAxis(str, enum.Enum):
+    """The resolved TRL axis — a reading of the inventor's own band (rule 5)."""
+
+    high = "high"  # ~6-9
+    low = "low"  # ~2-4
+
+
+class RouteType(str, enum.Enum):
+    """The four-outcome routes the two axes cross into (a SUGGESTION only)."""
+
+    venture = "venture"  # venture creation (sprint)
+    licensing = "licensing"
+    maturation = "maturation"  # needs-oriented maturation (signpost external funding)
+    option = "option"  # option / co-development
+    park = "park"  # logged, no route
+
+
+class AssetRouting(Base):
+    """The engine's two-axis routing SUGGESTION for an asset (brief §L4.4).
+
+    Routing is NOT the score: it is the crossing of two HUMAN validations — the
+    need axis (from the company) and the TRL axis (from the inventor). It stays
+    ``pending`` until both records exist, then suggests one of four routes. The
+    committee decides; both the suggestion and (optionally) the committee's
+    decision are stored. One row per asset, recomputed in place.
+    """
+
+    __tablename__ = "asset_routing"
+    __table_args__ = (UniqueConstraint("asset_id", name="uq_asset_routing_asset"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[RoutingStatus] = mapped_column(
+        Enum(RoutingStatus, name="routing_status"), nullable=False
+    )
+    need_axis: Mapped[NeedAxis | None] = mapped_column(
+        Enum(NeedAxis, name="need_axis"), nullable=True
+    )
+    trl_axis: Mapped[TrlAxis | None] = mapped_column(
+        Enum(TrlAxis, name="trl_axis"), nullable=True
+    )
+    suggested_route: Mapped[RouteType | None] = mapped_column(
+        Enum(RouteType, name="route_type"), nullable=True
+    )
+    committee_decision: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    asset: Mapped[Asset] = relationship()
+
+
 class Contact(Base):
     """A person at a company — RESTRICTED personal data (GDPR).
 
