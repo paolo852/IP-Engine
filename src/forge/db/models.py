@@ -20,6 +20,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Enum,
@@ -499,3 +500,129 @@ class RecalibrationLog(Base):
     verdict: Mapped[str] = mapped_column(String(32), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     weights_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Relationship Graph (T10) — the data pillar that makes need hypotheses
+# specific and reachable. A relationship is a FACT (company X collaborated with
+# our unit on project Y), so it carries a source pointer and a source_layer
+# (0 public / 1 registered / 2 tacit). Contacts (personal data) are isolated in
+# their own table behind stricter access (see governance.assert_contact_access).
+# ---------------------------------------------------------------------------
+class RelationshipType(str, enum.Enum):
+    """How a company is tied to the university (per spec schema)."""
+
+    research_contract = "research_contract"
+    collaborative_project = "collaborative_project"
+    spin_off = "spin_off"
+    industrial_phd = "industrial_phd"
+    lab_sponsor = "lab_sponsor"
+    alumni_employer = "alumni_employer"
+    committee_member = "committee_member"
+    other = "other"
+
+
+class Strength(str, enum.Enum):
+    """Qualitative strength of a relationship or a need hypothesis."""
+
+    weak = "weak"
+    medium = "medium"
+    strong = "strong"
+
+
+class Company(Base):
+    """A company node in the Relationship Graph.
+
+    ``normalized_name`` is the entity-resolution key (lower-cased, legal-suffix
+    stripped) and is unique, so re-ingesting the same firm merges rather than
+    duplicates. ``registry_id`` (PIC/VAT), when present, is the stronger match and
+    is resolved first by the repository.
+    """
+
+    __tablename__ = "company"
+    __table_args__ = (
+        UniqueConstraint("normalized_name", name="uq_company_normalized_name"),
+        Index("ix_company_registry", "registry_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    registry_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    size: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    relationships: Mapped[list["Relationship"]] = relationship(
+        back_populates="company", cascade="all, delete-orphan"
+    )
+    contacts: Mapped[list["Contact"]] = relationship(
+        back_populates="company", cascade="all, delete-orphan"
+    )
+
+
+class Relationship(Base):
+    """One tie between a company and the university, from one source layer."""
+
+    __tablename__ = "relationship"
+    __table_args__ = (
+        # A given tie (company, type, topic, source) is recorded once — re-runs
+        # of a Layer-0 population are idempotent.
+        UniqueConstraint(
+            "company_id", "type", "topic", "source_ref", name="uq_relationship_dedup"
+        ),
+        Index("ix_relationship_company", "company_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("company.id", ondelete="CASCADE"), nullable=False
+    )
+    university_unit: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    type: Mapped[RelationshipType] = mapped_column(
+        Enum(RelationshipType, name="relationship_type"), nullable=False
+    )
+    topic: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    end_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    strength: Mapped[Strength] = mapped_column(
+        Enum(Strength, name="strength"), nullable=False, default=Strength.medium
+    )
+    # 0 = public (e.g. CORDIS), 1 = registered (internal CSV), 2 = tacit (form).
+    source_layer: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Pointer to the origin fact (e.g. "cordis:project:101001234") — grounding.
+    source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    company: Mapped[Company] = relationship(back_populates="relationships")
+
+
+class Contact(Base):
+    """A person at a company — RESTRICTED personal data (GDPR).
+
+    Isolated in its own table behind stricter access; company-level matching must
+    work without it. ``lawful_basis`` records whether a lawful basis to hold/reveal
+    this contact exists (enforced by governance.assert_contact_access).
+    """
+
+    __tablename__ = "contact"
+    __table_args__ = (Index("ix_contact_company", "company_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("company.id", ondelete="CASCADE"), nullable=False
+    )
+    person: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    lawful_basis: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    company: Mapped[Company] = relationship(back_populates="contacts")

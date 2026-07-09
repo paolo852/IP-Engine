@@ -19,5 +19,7 @@ cordis:
   # results / Key Exploitable Results are ingested as `project_result` assets.
   # No credentials: the data is public.
   base_url: "https://cordis.europa.eu/api/search/results"
+  # Projects endpoint — participating organisations drive Layer-0 graph population.
+  projects_base_url: "https://cordis.europa.eu/api/search/projects"
   request_timeout_seconds: 30
   source_layer: "L1.cordis"

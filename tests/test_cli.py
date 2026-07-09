@@ -90,6 +90,26 @@ def test_recalibrate_command(session, capsys):
     assert "well_calibrated" in capsys.readouterr().out
 
 
+def test_graph_lists_companies(session, capsys):
+    from forge.connectors.cordis.parser import parse_project
+    from forge.graph import build_layer0
+    from pathlib import Path
+
+    fixture = Path(__file__).resolve().parent / "fixtures" / "cordis_project_single.json"
+    build_layer0(session, parse_project(fixture.read_bytes()))
+    session.commit()
+
+    assert main(["graph"]) == 0
+    out = capsys.readouterr().out
+    assert "Aurora Photonics GmbH" in out and "collaborative_project" in out
+    assert "SYNTHETIC UNIVERSITY" not in out  # the university is not a graph company
+
+
+def test_graph_view_permission_allows_viewer(session, capsys, monkeypatch):
+    monkeypatch.setenv("FORGE_ROLE", "viewer")  # viewer holds view_graph
+    assert main(["graph"]) == 0
+
+
 def test_no_command_prints_help(capsys):
     assert main([]) == 2
     assert "FORGE Mining Engine CLI" in capsys.readouterr().out

@@ -39,6 +39,8 @@ COMMAND_PERMISSIONS = {
     "assets": "view",
     "ingest-epo": "ingest",
     "ingest-cordis": "ingest",
+    "graph-cordis": "ingest",
+    "graph": "view_graph",
     "dormancy": "view",
     "pipeline": "run_pipeline",
     "cluster": "view",
@@ -105,6 +107,39 @@ def cmd_ingest_cordis(args, session: Session) -> int:
     for f in report.failed:
         print(f"  FAILED {f.ref} [{f.stage}]: {f.error}")
     return 0 if report.ok else 1
+
+
+def cmd_graph_cordis(args, session: Session) -> int:
+    from .config import load_connectors_config
+    from .connectors.cordis import CordisClient, CordisSettings
+    from .graph import populate_from_cordis_project
+
+    settings = CordisSettings.from_config(load_connectors_config("config/connectors.yaml"))
+    client = CordisClient(settings)
+    failed = False
+    for ref in args.refs:
+        try:
+            report = populate_from_cordis_project(session, client, ref)
+            print(f"  {report.summary()}")
+        except Exception as exc:  # noqa: BLE001 - isolate each project
+            session.rollback()
+            failed = True
+            print(f"  FAILED {ref}: {exc}", file=sys.stderr)
+    return 1 if failed else 0
+
+
+def cmd_graph(args, session: Session) -> int:
+    from .graph import get_companies
+
+    companies = get_companies(session)
+    if not companies:
+        print("(empty relationship graph)")
+        return 0
+    for c in companies:
+        rels = ", ".join(sorted({r.type.value for r in c.relationships})) or "-"
+        layers = sorted({r.source_layer for r in c.relationships})
+        print(f"{c.name}  [{c.country or '-'}]  ties: {rels}  layers: {layers}")
+    return 0
 
 
 def cmd_dormancy(args, session: Session) -> int:
@@ -348,6 +383,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ingest-cordis", help="ingest EU project results from CORDIS")
     p.add_argument("refs", nargs="+", help="CORDIS result ids or URLs")
     p.set_defaults(func=cmd_ingest_cordis)
+
+    p = sub.add_parser("graph-cordis", help="populate Layer-0 graph from CORDIS projects")
+    p.add_argument("refs", nargs="+", help="CORDIS project ids or URLs")
+    p.set_defaults(func=cmd_graph_cordis)
+
+    sub.add_parser("graph", help="list the relationship graph (companies + ties)").set_defaults(
+        func=cmd_graph
+    )
 
     p = sub.add_parser("dormancy", help="assess dormancy")
     _ids(p)

@@ -1,0 +1,13 @@
+{
+  "id": "101001234",
+  "acronym": "PHOTON-EDGE",
+  "title": "Photonic accelerators for edge intelligence (synthetic)",
+  "startDate": "2019-01-01",
+  "endDate": "2022-12-31",
+  "organizations": [
+    {"name": "SYNTHETIC UNIVERSITY", "activityType": "HES", "role": "coordinator", "country": "IT", "pic": "999900001"},
+    {"name": "SYNTHETIC RESEARCH CENTRE", "activityType": "REC", "role": "participant", "country": "DE", "pic": "999900002"},
+    {"name": "Aurora Photonics GmbH", "activityType": "PRC", "role": "participant", "country": "DE", "pic": "999900003", "sme": true},
+    {"name": "Borealis Systems S.p.A.", "activityType": "PRC", "role": "participant", "country": "IT", "pic": "999900004", "sme": false}
+  ]
+}

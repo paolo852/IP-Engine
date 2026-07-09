@@ -1,0 +1,11 @@
+{
+  "id": "101005678",
+  "acronym": "PHOTON-NEXT",
+  "title": "Next-generation photonic integration (synthetic)",
+  "startDate": "2023-01-01",
+  "endDate": "2025-12-31",
+  "organizations": [
+    {"name": "SYNTHETIC UNIVERSITY", "activityType": "HES", "role": "coordinator", "country": "IT", "pic": "999900001"},
+    {"name": "Aurora Photonics G.m.b.H.", "activityType": "PRC", "role": "participant", "country": "DE", "pic": "999900003", "sme": true}
+  ]
+}

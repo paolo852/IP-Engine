@@ -29,16 +29,19 @@ class CordisSettings:
     base_url: str
     source_layer: str = "L1.cordis"
     request_timeout_seconds: float = 30.0
+    projects_base_url: str | None = None  # for Layer-0 graph population (T10)
 
     @classmethod
     def from_config(cls, config: ConnectorsConfig) -> "CordisSettings":
         section = config.section("cordis")
         if not section.get("base_url"):
             raise ValueError("cordis connector config missing 'base_url'")
+        projects = section.get("projects_base_url")
         return cls(
             base_url=str(section["base_url"]).rstrip("/"),
             source_layer=section.get("source_layer", "L1.cordis"),
             request_timeout_seconds=float(section.get("request_timeout_seconds", 30.0)),
+            projects_base_url=str(projects).rstrip("/") if projects else None,
         )
 
 
@@ -49,13 +52,13 @@ class CordisClient:
         self.settings = settings
         self._transport = transport or UrllibTransport()
 
-    def _url(self, ref: str) -> str:
+    def _url(self, ref: str, base: str) -> str:
         if ref.startswith(("http://", "https://")):
             return ref
-        return f"{self.settings.base_url}/{ref}"
+        return f"{base}/{ref}"
 
-    def fetch_result(self, ref: str) -> RawRecord:
-        url = self._url(ref)
+    def _fetch(self, ref: str, base: str, what: str) -> RawRecord:
+        url = self._url(ref, base)
         resp = self._transport.request(
             "GET",
             url,
@@ -63,7 +66,7 @@ class CordisClient:
             timeout=self.settings.request_timeout_seconds,
         )
         if resp.status == 404:
-            raise CordisNotFound(f"CORDIS result not found: {ref}")
+            raise CordisNotFound(f"CORDIS {what} not found: {ref}")
         if resp.status >= 400:
             raise CordisError(f"CORDIS returned HTTP {resp.status} for {ref}")
         return RawRecord(
@@ -73,3 +76,11 @@ class CordisClient:
             content_type=resp.header("Content-Type", "application/json") or "application/json",
             retrieved_at=datetime.now(timezone.utc),
         )
+
+    def fetch_result(self, ref: str) -> RawRecord:
+        return self._fetch(ref, self.settings.base_url, "result")
+
+    def fetch_project(self, ref: str) -> RawRecord:
+        """Fetch a CORDIS project (its participating organisations drive Layer-0)."""
+        base = self.settings.projects_base_url or self.settings.base_url
+        return self._fetch(ref, base, "project")
