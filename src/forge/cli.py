@@ -42,6 +42,7 @@ COMMAND_PERMISSIONS = {
     "graph-cordis": "ingest",
     "graph": "view_graph",
     "hypotheses": "match",
+    "company-lists": "view_graph",
     "dormancy": "view",
     "pipeline": "run_pipeline",
     "cluster": "view",
@@ -163,6 +164,37 @@ def cmd_hypotheses(args, session: Session) -> int:
     for h in rows:
         print(f"  [{h.track.value}/{h.strength.value}] {h.company.name}")
         print(f"      {h.hypothesised_need}")
+    return 0
+
+
+def cmd_company_lists(args, session: Session) -> int:
+    from .matching import build_company_lists
+    from .repository import get_asset
+
+    asset = get_asset(session, uuid.UUID(args.asset_id))
+    if asset is None:
+        print(f"{args.asset_id}: not found", file=sys.stderr)
+        return 1
+    principal = Principal(
+        name=os.environ.get("FORGE_USER", "cli"),
+        role=os.environ.get("FORGE_ROLE", "admin"),
+    )
+    lists = build_company_lists(session, asset.id, principal=principal, governance=args.gov)
+    if lists.total() == 0:
+        print("(no company lists — generate hypotheses first: forge hypotheses <id> --generate)")
+        return 0
+
+    print(f"Dual-track company HYPOTHESES for {asset.title or asset.id} (unvalidated):")
+    for track, entries in (("CUSTOMER (has the problem)", lists.customer),
+                           ("PRODUCER / licensee (would make/sell)", lists.producer)):
+        print(f"\n{track}:")
+        if not entries:
+            print("  (none)")
+        for e in entries:
+            tag = "★ related" if e.related else "  unrelated"
+            rel = ", ".join(e.relationship_types) or "-"
+            contact = "" if e.has_contact is None else f"  contact:{'yes' if e.has_contact else 'no'}"
+            print(f"  {tag} [{e.strength}] {e.name}  (ties: {rel}, layers {e.source_layers}){contact}")
     return 0
 
 
@@ -420,6 +452,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("asset_id")
     p.add_argument("--generate", action="store_true", help="(re)generate before listing")
     p.set_defaults(func=cmd_hypotheses)
+
+    p = sub.add_parser("company-lists", help="dual-track customer/producer lists (graph-ranked)")
+    p.add_argument("asset_id")
+    p.set_defaults(func=cmd_company_lists)
 
     p = sub.add_parser("dormancy", help="assess dormancy")
     _ids(p)

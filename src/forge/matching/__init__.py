@@ -5,6 +5,7 @@ a human validation confirms it. Everything here produces grounded, testable
 hypotheses; nothing decides.
 """
 
+from .company_lists import CompanyListing, DualTrackLists, build_company_lists
 from .need_hypothesis import MODEL, NeedHypothesisDraft, generate
 from .repository import get_need_hypotheses, save_need_hypotheses
 from .service import run_matching
@@ -16,4 +17,7 @@ __all__ = [
     "save_need_hypotheses",
     "get_need_hypotheses",
     "run_matching",
+    "build_company_lists",
+    "DualTrackLists",
+    "CompanyListing",
 ]

@@ -141,6 +141,28 @@ def test_hypotheses_cli_generates_and_lists(session, capsys):
     assert "Aurora Photonics GmbH" in out and "unvalidated" in out.lower()
 
 
+def test_company_lists_cli(session, capsys):
+    from forge.db.models import Strength, Track
+    from forge.graph import add_relationship, resolve_company
+    from forge.matching import NeedHypothesisDraft, save_need_hypotheses
+    from forge.db.models import RelationshipType
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    company, _ = resolve_company(session, name="Aurora Photonics GmbH", country="DE")
+    add_relationship(session, company, type=RelationshipType.collaborative_project,
+                     source_layer=0, topic="PHOTON-EDGE", source_ref="cordis:project:1")
+    session.flush()
+    save_need_hypotheses(session, asset, [
+        NeedHypothesisDraft(company_id=company.id, track=Track.producer, strength=Strength.medium,
+                            hypothesised_need="Hypothesis (unvalidated): Aurora", evidence=[], rationale=""),
+    ])
+    session.commit()
+
+    assert main(["company-lists", str(asset.id)]) == 0
+    out = capsys.readouterr().out
+    assert "PRODUCER" in out and "Aurora Photonics GmbH" in out and "related" in out
+
+
 def test_no_command_prints_help(capsys):
     assert main([]) == 2
     assert "FORGE Mining Engine CLI" in capsys.readouterr().out
