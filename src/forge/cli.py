@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from .config import load_governance_config
 from .db.base import create_db_engine, get_database_url, make_session_factory
-from .db.models import Asset, DecisionType, OutcomeType
+from .db.models import Asset, DecisionType, NeedOutcome, OutcomeType, Track
 from .governance import GovernanceError, Principal, authorize
 
 # Each command requires a permission; RBAC is enforced before the command runs.
@@ -43,6 +43,9 @@ COMMAND_PERMISSIONS = {
     "graph": "view_graph",
     "hypotheses": "match",
     "company-lists": "view_graph",
+    "validate-need": "validate",
+    "trl": "record_trl",
+    "trl-form": "view_graph",
     "dormancy": "view",
     "pipeline": "run_pipeline",
     "cluster": "view",
@@ -195,6 +198,61 @@ def cmd_company_lists(args, session: Session) -> int:
             rel = ", ".join(e.relationship_types) or "-"
             contact = "" if e.has_contact is None else f"  contact:{'yes' if e.has_contact else 'no'}"
             print(f"  {tag} [{e.strength}] {e.name}  (ties: {rel}, layers {e.source_layers}){contact}")
+    return 0
+
+
+def cmd_validate_need(args, session: Session) -> int:
+    from .db.models import NeedOutcome, Track
+    from .repository import get_asset
+    from .validation import record_need_validation
+
+    asset = get_asset(session, uuid.UUID(args.asset_id))
+    if asset is None:
+        print(f"{args.asset_id}: not found", file=sys.stderr)
+        return 1
+    record_need_validation(
+        session, asset,
+        company_id=uuid.UUID(args.company_id),
+        track=Track[args.track],
+        outcome=NeedOutcome[args.outcome],
+        validated_by=args.by,
+        note=args.note,
+    )
+    print(f"recorded need validation: {args.track} {args.outcome} for {asset.title or asset.id}")
+    return 0
+
+
+def cmd_trl_form(args, session) -> int:
+    from .config import load_trl_config
+    from .validation import build_questionnaire
+
+    print(build_questionnaire(load_trl_config("config/trl.yaml")).render())
+    return 0
+
+
+def cmd_trl(args, session: Session) -> int:
+    from .config import load_trl_config
+    from .repository import get_asset
+    from .validation import record_trl_check, validate_band
+
+    asset = get_asset(session, uuid.UUID(args.asset_id))
+    if asset is None:
+        print(f"{args.asset_id}: not found", file=sys.stderr)
+        return 1
+    cfg = load_trl_config("config/trl.yaml")
+    try:
+        band = validate_band(args.band, cfg)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    evidence = {
+        "prototype": args.prototype,
+        "real_case_tested": args.real_case_tested,
+        "simulation_only": args.simulation_only,
+    }
+    record_trl_check(session, asset, trl_band=band, evidence=evidence, recorded_by=args.by, note=args.note)
+    reading = "high (~6-9)" if cfg.is_high(band) else "low (~2-4)"
+    print(f"recorded inventor TRL {band} [{reading}] for {asset.title or asset.id}")
     return 0
 
 
@@ -456,6 +514,29 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("company-lists", help="dual-track customer/producer lists (graph-ranked)")
     p.add_argument("asset_id")
     p.set_defaults(func=cmd_company_lists)
+
+    sub.add_parser("trl-form", help="print the inventor TRL micro-questionnaire").set_defaults(
+        func=cmd_trl_form, needs_db=False
+    )
+
+    p = sub.add_parser("validate-need", help="record a company's validation of a need hypothesis")
+    p.add_argument("asset_id")
+    p.add_argument("company_id")
+    p.add_argument("track", choices=[t.name for t in Track])
+    p.add_argument("outcome", choices=[o.name for o in NeedOutcome])
+    p.add_argument("--by", default="analyst")
+    p.add_argument("--note", default=None)
+    p.set_defaults(func=cmd_validate_need)
+
+    p = sub.add_parser("trl", help="record the inventor's TRL band for an asset")
+    p.add_argument("asset_id")
+    p.add_argument("band", help="a TRL band from config/trl.yaml, e.g. 2-4 or 6-9")
+    p.add_argument("--prototype", action="store_true")
+    p.add_argument("--real-case-tested", action="store_true", dest="real_case_tested")
+    p.add_argument("--simulation-only", action="store_true", dest="simulation_only")
+    p.add_argument("--by", default="inventor")
+    p.add_argument("--note", default=None)
+    p.set_defaults(func=cmd_trl)
 
     p = sub.add_parser("dormancy", help="assess dormancy")
     _ids(p)

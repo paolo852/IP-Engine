@@ -1,0 +1,22 @@
+# TRL micro-questionnaire — CONFIG, not code (rule 3).
+#
+# The Engine GENERATES this questionnaire but NEVER answers it or estimates TRL:
+# TRL comes from the inventor (rule 5). The high/low reading below is a
+# deterministic interpretation of the inventor's OWN chosen band for two-axis
+# routing — not an estimate the Engine makes from the patent text.
+
+# Bands an inventor may pick from.
+bands: ["2-4", "4-6", "6-9"]
+# Bands that count as "high" TRL (~6-9) for routing; anything else is treated as
+# low (~2-4). Interpreting the inventor's answer, not guessing it.
+high_bands: ["6-9"]
+
+# The questions the inventor answers (yes/no). Their answers are stored as
+# evidence on the TRL check; the Engine never fills them in.
+questions:
+  - id: prototype
+    text: "Is there a working prototype (beyond simulation)?"
+  - id: real_case_tested
+    text: "Has it been tested on a real case or in a relevant environment?"
+  - id: simulation_only
+    text: "Is the supporting evidence simulation-only so far?"

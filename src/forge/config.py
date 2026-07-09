@@ -493,3 +493,48 @@ def load_needs_config(path: str | os.PathLike[str]) -> NeedsConfig:
         customer_template=templates["customer"],
         producer_template=templates["producer"],
     )
+
+
+@dataclass(frozen=True)
+class TrlConfig:
+    """Validated TRL micro-questionnaire config (rules 3 & 5).
+
+    The Engine generates the questionnaire; the inventor answers. ``high_bands``
+    is a deterministic interpretation of the inventor's own band for routing, not
+    an Engine estimate of TRL.
+    """
+
+    bands: tuple[str, ...]
+    high_bands: tuple[str, ...]
+    questions: tuple[dict, ...]  # ({"id": str, "text": str}, ...)
+
+    def is_high(self, band: str) -> bool:
+        return band in self.high_bands
+
+
+def load_trl_config(path: str | os.PathLike[str]) -> TrlConfig:
+    """Load + validate the TRL micro-questionnaire."""
+    data = _read_yaml(path)
+    bands = data.get("bands")
+    if not isinstance(bands, list) or not bands or not all(isinstance(b, str) for b in bands):
+        raise ConfigError("trl config 'bands' must be a non-empty list of strings")
+    high = data.get("high_bands", [])
+    if not isinstance(high, list) or not all(isinstance(b, str) for b in high):
+        raise ConfigError("trl config 'high_bands' must be a list of strings")
+    if not set(high) <= set(bands):
+        raise ConfigError("trl 'high_bands' must be a subset of 'bands'")
+
+    raw_qs = data.get("questions")
+    if not isinstance(raw_qs, list) or not raw_qs:
+        raise ConfigError("trl config 'questions' must be a non-empty list")
+    questions: list[dict] = []
+    for q in raw_qs:
+        if not isinstance(q, dict) or not q.get("id") or not q.get("text"):
+            raise ConfigError("each trl question needs an 'id' and 'text'")
+        questions.append({"id": str(q["id"]), "text": str(q["text"])})
+
+    return TrlConfig(
+        bands=tuple(str(b) for b in bands),
+        high_bands=tuple(str(b) for b in high),
+        questions=tuple(questions),
+    )

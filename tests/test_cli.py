@@ -163,6 +163,34 @@ def test_company_lists_cli(session, capsys):
     assert "PRODUCER" in out and "Aurora Photonics GmbH" in out and "related" in out
 
 
+def test_validate_need_and_trl_cli(session, capsys):
+    from forge.db.models import NeedOutcome, Track
+    from forge.graph import resolve_company
+    from forge.validation import confirmed_tracks, latest_trl_check
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    company, _ = resolve_company(session, name="Aurora Photonics GmbH")
+    session.commit()
+
+    assert main(["validate-need", str(asset.id), str(company.id), "producer",
+                 "need_confirmed", "--by", "ops"]) == 0
+    assert "recorded need validation" in capsys.readouterr().out
+    assert confirmed_tracks(session, asset.id) == {Track.producer}
+
+    assert main(["trl", str(asset.id), "6-9", "--prototype", "--by", "inv"]) == 0
+    assert "high (~6-9)" in capsys.readouterr().out
+    assert latest_trl_check(session, asset.id).trl_band == "6-9"
+
+    # An unknown band is rejected, not stored.
+    assert main(["trl", str(asset.id), "9-10"]) == 1
+
+
+def test_trl_form_prints_questionnaire(capsys):
+    assert main(["trl-form"]) == 0
+    out = capsys.readouterr().out
+    assert "TRL band" in out and "prototype" in out
+
+
 def test_no_command_prints_help(capsys):
     assert main([]) == 2
     assert "FORGE Mining Engine CLI" in capsys.readouterr().out

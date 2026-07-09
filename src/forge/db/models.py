@@ -650,6 +650,74 @@ class NeedHypothesis(Base):
     company: Mapped[Company] = relationship()
 
 
+class NeedOutcome(str, enum.Enum):
+    """The result of a human validation of a need hypothesis (rule 4)."""
+
+    need_confirmed = "need_confirmed"
+    need_denied = "need_denied"
+    no_response = "no_response"
+
+
+class NeedValidation(Base):
+    """A human validation of a need hypothesis, from the company (the NEED axis).
+
+    This is what turns a hypothesis into a (dis)confirmed need — a hypothesis is
+    only ever a hypothesis until this exists (rule 4). Append-only history; the
+    latest per (asset, company, track) is what routing reads.
+    """
+
+    __tablename__ = "need_validation"
+    __table_args__ = (Index("ix_need_validation_asset", "asset_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset.id", ondelete="CASCADE"), nullable=False
+    )
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("company.id", ondelete="CASCADE"), nullable=False
+    )
+    track: Mapped[Track] = mapped_column(Enum(Track, name="track"), nullable=False)
+    outcome: Mapped[NeedOutcome] = mapped_column(
+        Enum(NeedOutcome, name="need_outcome"), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    validated_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    asset: Mapped[Asset] = relationship()
+    company: Mapped[Company] = relationship()
+
+
+class InventorTrlCheck(Base):
+    """The inventor's TRL band for an asset (the TRL axis).
+
+    The Engine GENERATES the TRL micro-questionnaire but NEVER estimates TRL — it
+    comes from the inventor (rule 5). We store the inventor's band and the evidence
+    they reported; the high/low reading used by routing is a deterministic
+    interpretation of that answer, not an estimate. Append-only; latest wins.
+    """
+
+    __tablename__ = "inventor_trl_check"
+    __table_args__ = (Index("ix_inventor_trl_check_asset", "asset_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=_uuid)
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("asset.id", ondelete="CASCADE"), nullable=False
+    )
+    trl_band: Mapped[str] = mapped_column(String(16), nullable=False)
+    # {prototype?: bool, real_case_tested?: bool, simulation_only?: bool}
+    evidence: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recorded_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    asset: Mapped[Asset] = relationship()
+
+
 class Contact(Base):
     """A person at a company — RESTRICTED personal data (GDPR).
 
