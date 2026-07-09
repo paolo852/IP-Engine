@@ -18,7 +18,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..db.models import Asset
 from .. import repository as repo
@@ -60,21 +60,24 @@ class AssetAudit:
 @dataclass
 class StoreAudit:
     audits: list[AssetAudit] = field(default_factory=list)
+    # Store-wide, non-per-asset violations: licence separation + graph grounding.
+    store_violations: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
-        return all(a.ok for a in self.audits)
+        return all(a.ok for a in self.audits) and not self.store_violations
 
     @property
     def claim_count(self) -> int:
         return sum(a.claim_count for a in self.audits)
 
     def violations(self) -> list[str]:
-        return [f"{a.title or a.asset_id}: {v}" for a in self.audits for v in a.violations]
+        asset = [f"{a.title or a.asset_id}: {v}" for a in self.audits for v in a.violations]
+        return asset + list(self.store_violations)
 
     def summary(self) -> str:
         grounded = sum(a.grounded_count for a in self.audits)
-        viol = sum(len(a.violations) for a in self.audits)
+        viol = sum(len(a.violations) for a in self.audits) + len(self.store_violations)
         verdict = "PASS" if self.ok else "FAIL"
         return (
             f"grounding audit {verdict}: {len(self.audits)} assets, "
@@ -91,6 +94,11 @@ class StoreAudit:
                 src = ", ".join(t.sources) if t.sources else "NO SOURCE"
                 lines.append(f"    {mark} [{t.layer}] {t.claim}  ←  {src}")
             for v in a.violations:
+                lines.append(f"    ✗ VIOLATION: {v}")
+            lines.append("")
+        if self.store_violations:
+            lines.append("store-wide (licence separation / graph grounding):")
+            for v in self.store_violations:
                 lines.append(f"    ✗ VIOLATION: {v}")
             lines.append("")
         return "\n".join(lines).rstrip() + "\n"
@@ -158,14 +166,72 @@ def audit_asset(session: Session, asset_id: uuid.UUID) -> AssetAudit | None:
         if not ev.source:
             audit.violations.append(f"evidence '{claim}' has no source (rule 1)")
 
+    # 4. Need hypotheses — an emitted (falsifiable) sentence must trace to the
+    #    grounding pointer it was derived from (the graph tie), rules 1 & 4.
+    from ..matching import get_need_hypotheses
+
+    for h in get_need_hypotheses(session, asset.id):
+        refs = [
+            str(e["ref"])
+            for e in (h.evidence or [])
+            if isinstance(e, dict) and e.get("ref")
+        ]
+        claim = f"{h.track.value} need: {h.company.name}"
+        audit.traces.append(ClaimTrace("hypothesis", claim, refs))
+        if not refs:
+            audit.violations.append(
+                f"need hypothesis for '{h.company.name}' has no source pointer (rule 1)"
+            )
+
     return audit
 
 
+def licence_separation_audit(session: Session) -> list[str]:
+    """Rule 5/7: licensed RAW data must never back an asset's factual fields.
+
+    Licensed sources (Dealroom/PATSTAT) may only ground DERIVED signals (Evidence)
+    — storing an asset fact grounded directly to a licensed source would republish
+    licensed raw. Any such field provenance is a violation.
+    """
+    from ..db.models import FieldProvenance, Licence
+
+    licensed = {Licence.licensed_dealroom, Licence.licensed_patstat}
+    out: list[str] = []
+    stmt = select(FieldProvenance).options(selectinload(FieldProvenance.source))
+    for fp in session.execute(stmt).scalars():
+        if fp.source is not None and fp.source.licence in licensed:
+            out.append(
+                f"asset {fp.asset_id} field '{fp.field_name}' is grounded to a LICENSED "
+                f"raw source ({_src_label(fp.source)}, {fp.source.licence.value}) — licensed "
+                "raw must back only derived signals, never asset facts (rule 5)"
+            )
+    return out
+
+
+def graph_grounding_audit(session: Session) -> list[str]:
+    """Rule 1 for the graph: a public/registered relationship (source_layer 0/1)
+    must carry a source pointer. Tacit (layer 2) ties are entered by a person and
+    are exempt from a source_ref."""
+    from ..db.models import Relationship
+
+    out: list[str] = []
+    for rel in session.execute(select(Relationship)).scalars():
+        if rel.source_layer in (0, 1) and not rel.source_ref:
+            out.append(
+                f"relationship {rel.id} (company {rel.company_id}, layer {rel.source_layer}) "
+                "has no source_ref — a public/registered graph tie must be grounded (rule 1)"
+            )
+    return out
+
+
 def audit_store(session: Session) -> StoreAudit:
-    """Run the grounding audit over every asset in the store."""
+    """Run the full governance audit: per-asset grounding (incl. need hypotheses),
+    plus store-wide licence-separation and graph-grounding checks (T16)."""
     store = StoreAudit()
     for asset_id in session.execute(select(Asset.id).order_by(Asset.created_at)).scalars():
         a = audit_asset(session, asset_id)
         if a is not None:
             store.audits.append(a)
+    store.store_violations.extend(licence_separation_audit(session))
+    store.store_violations.extend(graph_grounding_audit(session))
     return store
