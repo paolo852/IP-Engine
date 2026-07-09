@@ -13,6 +13,15 @@ data_protection:
   # Source licence classes permitted for stored ASSETS in development.
   dev_allowed_licences: [free, public, synthetic]
 
+contacts:
+  # Personal contact data in the Relationship Graph (person, email) is the
+  # highest-sensitivity record — behind a STRICTER gate than company-level graph
+  # view. Revealing a contact needs the 'view_contacts' permission AND a recorded
+  # lawful basis, and is disabled entirely in development (the dev graph is
+  # synthetic — rule 6). Company-level matching must work with contacts hidden.
+  enabled_in_dev: false
+  require_lawful_basis: true
+
 residency:
   # EU-hosting is preferred for hosted-LLM calls. In production_eu set this true
   # to ENFORCE (block non-EU endpoints); in development it is advisory (warns).
@@ -21,9 +30,11 @@ residency:
   eu_host_markers: ["eu.", ".eu/", "europe", "eu-"]
 
 rbac:
-  # role -> permissions. 'admin' implies every permission.
+  # role -> permissions. 'admin' implies every permission. Company-level graph
+  # view (view_graph) is broad; view_contacts (personal data) is admin-only by
+  # default — the stricter gate the graph's GDPR posture requires.
   roles:
-    viewer:    [view]
-    analyst:   [view, ingest, run_pipeline]
-    committee: [view, decide, record_outcome]
+    viewer:    [view, view_graph]
+    analyst:   [view, ingest, run_pipeline, view_graph, match, validate, record_trl]
+    committee: [view, decide, record_outcome, view_graph, validate]
     admin:     [admin]

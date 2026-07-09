@@ -416,6 +416,9 @@ class GovernanceConfig:
     require_eu_hosting: bool
     eu_host_markers: tuple[str, ...]
     roles: dict  # role name -> tuple[str, ...] of permission names
+    # Relationship-graph contact policy (personal data — the strictest gate).
+    contacts_enabled_in_dev: bool = False
+    contacts_require_lawful_basis: bool = True
 
 
 def load_governance_config(path: str | os.PathLike[str]) -> GovernanceConfig:
@@ -427,6 +430,7 @@ def load_governance_config(path: str | os.PathLike[str]) -> GovernanceConfig:
 
     dp = data.get("data_protection") or {}
     res = data.get("residency") or {}
+    contacts = data.get("contacts") or {}
     rbac = data.get("rbac") or {}
     roles_raw = rbac.get("roles")
     if not isinstance(roles_raw, dict) or not roles_raw:
@@ -444,4 +448,6 @@ def load_governance_config(path: str | os.PathLike[str]) -> GovernanceConfig:
         require_eu_hosting=bool(res.get("require_eu_hosting", False)),
         eu_host_markers=tuple(str(m) for m in res.get("eu_host_markers", [])),
         roles=roles,
+        contacts_enabled_in_dev=bool(contacts.get("enabled_in_dev", False)),
+        contacts_require_lawful_basis=bool(contacts.get("require_lawful_basis", True)),
     )

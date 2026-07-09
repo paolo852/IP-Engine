@@ -26,6 +26,14 @@ PERMISSIONS = frozenset(
         "recalibrate",
         "delete_asset",
         "migrate",
+        # Relationship-graph & need-matching domain (T9+). Company-level graph
+        # access is separate from — and looser than — the restricted contact
+        # sub-record, which holds personal data.
+        "view_graph",
+        "view_contacts",
+        "match",
+        "validate",
+        "record_trl",
         "admin",
     }
 )
@@ -45,6 +53,10 @@ class DataProtectionError(GovernanceError):
 
 class ResidencyError(GovernanceError):
     """A hosted-LLM call would breach the data-residency policy (EU-hosting)."""
+
+
+class ContactAccessError(GovernanceError):
+    """Revealing a personal contact record is not permitted (dev safety / GDPR)."""
 
 
 @dataclass(frozen=True)
@@ -92,6 +104,48 @@ def assert_storable(asset_type: str, licence: str, config: GovernanceConfig) -> 
             f"licence {licence!r} is not permitted in development "
             f"(synthetic/public only: {list(config.dev_allowed_licences)})"
         )
+
+
+def assert_contact_access(
+    principal: Principal, config: GovernanceConfig, *, lawful_basis: bool
+) -> None:
+    """Guard the restricted contact sub-record (person/email) — the graph's
+    highest-sensitivity, personal data. Three gates, all must pass:
+
+    1. RBAC — the principal must hold ``view_contacts`` (stricter than the
+       company-level ``view_graph``).
+    2. Dev safety (rule 6) — contacts are disabled in development unless the
+       policy explicitly enables them; the dev graph is synthetic and holds no
+       real personal data.
+    3. GDPR lawful basis — when the policy requires it, a lawful basis must be
+       recorded for this contact before person/email may be revealed.
+
+    Raises AuthorizationError or ContactAccessError; returns None if all pass.
+    """
+    authorize(principal, "view_contacts", config)  # gate 1 (raises AuthorizationError)
+    if config.mode == "development" and not config.contacts_enabled_in_dev:
+        raise ContactAccessError(
+            "contact details are disabled in development (synthetic graph only, "
+            "no real personal data — rule 6)"
+        )
+    if config.contacts_require_lawful_basis and not lawful_basis:
+        raise ContactAccessError(
+            "no lawful basis recorded for this contact — person/email may not be "
+            "revealed (GDPR)"
+        )
+
+
+def contacts_visible(
+    principal: Principal, config: GovernanceConfig, *, lawful_basis: bool
+) -> bool:
+    """Non-raising counterpart for the UI. Contacts are hidden by DEFAULT —
+    company-level matching must work without them — so this returns True only when
+    every contact-access gate passes."""
+    try:
+        assert_contact_access(principal, config, lawful_basis=lawful_basis)
+        return True
+    except GovernanceError:
+        return False
 
 
 def check_llm_residency(base_url: str | None, config: GovernanceConfig) -> tuple[bool, str]:
