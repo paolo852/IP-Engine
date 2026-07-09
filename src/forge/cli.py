@@ -41,6 +41,7 @@ COMMAND_PERMISSIONS = {
     "ingest-cordis": "ingest",
     "graph-cordis": "ingest",
     "graph": "view_graph",
+    "hypotheses": "match",
     "dormancy": "view",
     "pipeline": "run_pipeline",
     "cluster": "view",
@@ -139,6 +140,29 @@ def cmd_graph(args, session: Session) -> int:
         rels = ", ".join(sorted({r.type.value for r in c.relationships})) or "-"
         layers = sorted({r.source_layer for r in c.relationships})
         print(f"{c.name}  [{c.country or '-'}]  ties: {rels}  layers: {layers}")
+    return 0
+
+
+def cmd_hypotheses(args, session: Session) -> int:
+    from .config import load_needs_config
+    from .matching import get_need_hypotheses, run_matching
+    from .repository import get_asset
+
+    asset = get_asset(session, uuid.UUID(args.asset_id))
+    if asset is None:
+        print(f"{args.asset_id}: not found", file=sys.stderr)
+        return 1
+    if args.generate:
+        run_matching(session, asset, cfg=load_needs_config("config/needs.yaml"))
+
+    rows = get_need_hypotheses(session, asset.id)
+    if not rows:
+        print("(no need hypotheses — run with --generate, and populate the graph first)")
+        return 0
+    print(f"Need HYPOTHESES for {asset.title or asset.id} (unvalidated — humans decide):")
+    for h in rows:
+        print(f"  [{h.track.value}/{h.strength.value}] {h.company.name}")
+        print(f"      {h.hypothesised_need}")
     return 0
 
 
@@ -391,6 +415,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("graph", help="list the relationship graph (companies + ties)").set_defaults(
         func=cmd_graph
     )
+
+    p = sub.add_parser("hypotheses", help="generate/list falsifiable need hypotheses")
+    p.add_argument("asset_id")
+    p.add_argument("--generate", action="store_true", help="(re)generate before listing")
+    p.set_defaults(func=cmd_hypotheses)
 
     p = sub.add_parser("dormancy", help="assess dormancy")
     _ids(p)

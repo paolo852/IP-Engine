@@ -451,3 +451,45 @@ def load_governance_config(path: str | os.PathLike[str]) -> GovernanceConfig:
         contacts_enabled_in_dev=bool(contacts.get("enabled_in_dev", False)),
         contacts_require_lawful_basis=bool(contacts.get("require_lawful_basis", True)),
     )
+
+
+@dataclass(frozen=True)
+class NeedsConfig:
+    """Validated need-hypothesis phrasing + thresholds (rule 3).
+
+    Phrasing carries the falsifiability guard by construction; a hypothesis is
+    never a need (rule 4).
+    """
+
+    min_shared_terms: int
+    strengthen_shared_terms: int
+    prefix: str
+    customer_template: str
+    producer_template: str
+
+
+def load_needs_config(path: str | os.PathLike[str]) -> NeedsConfig:
+    """Load + validate need-hypothesis generation config."""
+    data = _read_yaml(path)
+    try:
+        min_shared = int(data.get("min_shared_terms", 1))
+        strengthen = int(data.get("strengthen_shared_terms", 2))
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"needs config thresholds must be integers: {exc}") from exc
+    if min_shared < 1:
+        raise ConfigError("needs 'min_shared_terms' must be >= 1")
+
+    templates = data.get("templates") or {}
+    if not isinstance(templates, dict):
+        raise ConfigError("needs config 'templates' must be a mapping")
+    for key in ("prefix", "customer", "producer"):
+        if not isinstance(templates.get(key), str) or not templates[key].strip():
+            raise ConfigError(f"needs config 'templates.{key}' must be a non-empty string")
+
+    return NeedsConfig(
+        min_shared_terms=min_shared,
+        strengthen_shared_terms=strengthen,
+        prefix=templates["prefix"],
+        customer_template=templates["customer"],
+        producer_template=templates["producer"],
+    )

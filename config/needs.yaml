@@ -1,0 +1,21 @@
+# Need-hypothesis generation — CONFIG, not code (rule 3).
+#
+# A need hypothesis is ONLY EVER a hypothesis (rule 4): it becomes a real need
+# only after a human validation records it as confirmed. The phrasing below is
+# deliberately falsifiable — each sentence names the test that would confirm or
+# deny it — and always carries the "unvalidated" guard so a hypothesis is never
+# presented as a need.
+
+# Minimum shared market-term overlap between an asset application and a company
+# (via the graph) required to hypothesise a need at all.
+min_shared_terms: 1
+# Shared-term count at/above which the hypothesis strength is bumped one level
+# (convergence of evidence = stronger hypothesis).
+strengthen_shared_terms: 2
+
+templates:
+  prefix: "Hypothesis (unvalidated, not a confirmed need):"
+  # {company}, {application}, {context} are filled from the matched company and
+  # the asset's candidate application.
+  customer: "{company} may need a solution for {application} — falsifiable by asking whether they currently face this in {context}."
+  producer: "{company} may want to produce or license {application} using this capability — falsifiable by asking whether it fits their product roadmap."

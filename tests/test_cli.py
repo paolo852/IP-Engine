@@ -110,6 +110,37 @@ def test_graph_view_permission_allows_viewer(session, capsys, monkeypatch):
     assert main(["graph"]) == 0
 
 
+def test_hypotheses_cli_generates_and_lists(session, capsys):
+    from pathlib import Path
+
+    from forge.connectors.cordis.parser import parse_project
+    from forge.enrichment.profiling import AssetProfile, GroundedField
+    from forge.graph import build_layer0
+
+    def g(name, value, field, **extra):
+        return GroundedField(name=name, value=value, quote="q", source_field=field, **extra)
+
+    asset = save_asset(session, synthetic_patent_bundle())
+    save_profile(
+        session, asset,
+        AssetProfile(
+            problem=g("problem", "energy", "abstract"),
+            solution=g("solution", "modulator", "claims_or_description"),
+            applications=[g("application[0]", "co-packaged optics", "abstract",
+                            end_customer="data centres", use_case="interconnect",
+                            industry_terms=["photonics"])],
+            query_terms=["photonics"], model="m", technology_summary="silicon photonics",
+        ),
+    )
+    fixture = Path(__file__).resolve().parent / "fixtures" / "cordis_project_single.json"
+    build_layer0(session, parse_project(fixture.read_bytes()))
+    session.commit()
+
+    assert main(["hypotheses", str(asset.id), "--generate"]) == 0
+    out = capsys.readouterr().out
+    assert "Aurora Photonics GmbH" in out and "unvalidated" in out.lower()
+
+
 def test_no_command_prints_help(capsys):
     assert main([]) == 2
     assert "FORGE Mining Engine CLI" in capsys.readouterr().out
